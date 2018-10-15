@@ -9,7 +9,7 @@
 """
 Created on Thu Oct  4 11:11:29 2018
 
-@authors: Alexandra Lukasiewicz and Matt McGuffi
+@authors: Alexandra Lukasiewicz and Matt McGuffie
 Purpose: Using A. Hockenberry SD sequence energy prediction, scan insert fasta 
 for potential Ribosome Binding Sites (RBS)
 """
