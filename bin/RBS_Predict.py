@@ -24,7 +24,7 @@ parser.add_argument('-i',
 
 parser.add_argument('-o',  
     action='store', 
-    dest='i',
+    dest='o',
     required=True,
     type=str,
     help="prefix/title of .txt outfile")
