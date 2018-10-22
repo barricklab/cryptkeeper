@@ -12,47 +12,86 @@ import csv
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='import fasta for bTSS slicing')
-parser.add_argument('-i',  
+parser.add_argument(
+    '-i',  
     action='store', 
     dest='i',
     required=True,
     type=str,
-    help="input .fasta file to slice upstream of bTSSfinder")
+    help="input .fasta file to slice upstream of bTSSfinder",
+    )
 
-parser.add_argument('-o',  
+parser.add_argument(
+    '-o',  
     action='store', 
     dest='o',
     required=True,
     type=str,
-    help="output file prefix")
+    help="output file prefix",
+    )
+    
+parser.add_argument(
+    '--window-size',  
+    action='store', 
+    dest='ws',
+    type=int,
+    help="size of sequence chunks processed",
+    default=500,
+    )
+    
+parser.add_argument(
+    '--window-offset',  
+    action='store', 
+    dest='wo',
+    type=int,
+    help="offset between starts of sequence chunks",
+    default=250,
+    )
 
 #------------------------------------------------------------------------------
+
+#Generic function for splitting input sequence file
+def create_split_sequence_file(input_file_name, output_file_name, window_size = 10000, window_offset = 10000, sequence_format="fasta", name_delimiter="___"):
+
+  split_fasta_list = []
+
+  for this_seq in SeqIO.parse(input_file_name, sequence_format):
+    for n in range(0, max(1,int((len(this_seq)/window_offset)))):
+      start_0_indexed = 0 + n*window_offset
+      end_0_indexed = min(start_0_indexed + window_size - 1, len(this_seq))
+    
+      #print(str(start_1) + "-" + str(end_1))
+    
+      split_fasta_name = name_delimiter.join([this_seq.id, str(start_0_indexed+1), str(end_0_indexed+1)])
+      split_fasta_seq  = this_seq.seq[start_0_indexed:end_0_indexed]
+
+      split_fasta_record = SeqRecord(seq = split_fasta_seq, id = split_fasta_name, description="")
+      split_fasta_list.append(split_fasta_record)
+
+  #write split sequence file
+  SeqIO.write(split_fasta_list, output_file_name, sequence_format)
+
+
+#------------------------------------------------------------------------------
+
 options = parser.parse_args()
 
-## separates names/coords
+## global setting - separates names/coords
 name_delimiter = "___"
 
-split_fasta_list = []
 
-#prepare fasta sections of 500 bp for bTSSfinder 
-for this_seq in SeqIO.parse(options.i, "fasta"):
-  for n in range(0, max(1,int((len(this_seq)/250)))):
-    start_1 = 0 + n*250
-    end_1 = min(start_1 + 500 - 1, len(this_seq))
-    
-    #print(str(start_1) + "-" + str(end_1))
-    
-    split_fasta_name = name_delimiter.join([this_seq.id, str(start_1), str(end_1)])
-    split_fasta_seq  = this_seq.seq[start_1:end_1]
-
-    split_fasta_record = SeqRecord(seq = split_fasta_seq, id = split_fasta_name, description="")
-    split_fasta_list.append(split_fasta_record)
-
-#write fasta for bTSSfinder
-SeqIO.write(split_fasta_list, options.o + ".split.fa", "fasta")
+# split into smaller FASTA for processing
+create_split_sequence_file(
+  input_file_name = options.i, 
+  output_file_name = options.o + ".split.fa",
+  window_size = options.ws,
+  window_offset = options.wo,
+  sequence_format = "fasta",
+  name_delimiter = name_delimiter,
+  )
 
 #run bTSSfinder 
-subprocess.call('bTSSfinder -i '+ options.o + '.split.fa -o '+ options.o +' -h 2', shell = True)
+#subprocess.call('bTSSfinder -i '+ options.o + '.split.fa -o '+ options.o +' -h 2', shell = True)
       
 ## Read in entries from the .bed file
 bedfile_summary = open(options.o + ".bed","r")
