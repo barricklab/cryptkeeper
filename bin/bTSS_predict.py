@@ -9,6 +9,8 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 import subprocess
 import csv
+from operator import itemgetter
+
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='import fasta for bTSS slicing')
@@ -91,7 +93,7 @@ create_split_sequence_file(
   )
 
 #run bTSSfinder 
-#subprocess.call('bTSSfinder -i '+ options.o + '.split.fa -o '+ options.o +' -h 2', shell = True)
+subprocess.call('bTSSfinder -i '+ options.o + '.split.fa -o '+ options.o +' -h 2 -x 50', shell = True)
       
 ## Read in entries from the .bed file
 bedfile_summary = open(options.o + ".bed","r")
@@ -117,7 +119,7 @@ for line in lines:
     this_minus_10_position = this_sigma_factor_sites_list[1]
   
   new_entry = {
-      "sigma_factor" : data[3],
+      "sigma_factor" : data[3].split('_')[0],
       "strand" : data[5],
       "TSS_position" : start_offset + int(data[6]),
       "minus_10_position" : start_offset + int(this_minus_10_position),
@@ -127,6 +129,9 @@ for line in lines:
 
 bedfile_summary.close()
 
+#sort list by coordinate
+sorted_entry_list = sorted(entry_list, key=itemgetter('TSS_position')) 
+
 with open(options.o + '_corrected.txt','w') as corrected_bed:
   writer = csv.DictWriter(
       corrected_bed, 
@@ -134,7 +139,7 @@ with open(options.o + '_corrected.txt','w') as corrected_bed:
       fieldnames = ["sigma_factor", "strand", "TSS_position", "minus_35_position", "minus_10_position"]
     )
   writer.writeheader()
-  writer.writerows(entry_list)
+  writer.writerows(sorted_entry_list)
 corrected_bed.close()
 
     
