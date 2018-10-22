@@ -60,11 +60,10 @@ with open(options.o + "_summary.fasta", "w") as handle:
     handle.close()
 
 #run bTSSfinder 
-subprocess.Popen('bTSSfinder -i'+ options.o + '_summary.fasta -o '+options.o+' -h 2',
-                 shell = True)
+subprocess.call('bTSSfinder -i '+ options.o + '_summary.fasta -o '+options.o+' -h 2', shell = True)
       
 ##how to manage full .bed file summary 
-bedfile_summary = open(options.o + "_summary.bed","r")
+bedfile_summary = open(options.o + ".bed","r")
 lines = bedfile_summary.readlines()
 search_coords = []
 sigma_factors = []
@@ -80,8 +79,8 @@ for line in lines:
     direction.append(data[5])
 bedfile_summary.close()
     
-start_coords = [i.split('_',3)[2] for i in search_coords] 
-end_coords = [i.split('_',3)[3]for i in search_coords]
+start_coords = [i.split('_',3)[1] for i in search_coords] 
+end_coords = [i.split('_',3)[2]for i in search_coords]
 print(end_coords)
 sigma_one = [i.split(',',1)[0] for i in sigma_site]
 sigma_two = [i.split(',',1)[1] for i in sigma_site]
