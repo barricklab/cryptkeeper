@@ -60,7 +60,7 @@ with open(options.o + "_summary.fasta", "w") as handle:
     handle.close()
 
 #run bTSSfinder 
-subprocess.Popen('bTSSfinder -i'+ options.o + '_summary.fasta -o'+options.o+' -h 2',
+subprocess.Popen('bTSSfinder -i'+ options.o + '_summary.fasta -o '+options.o+' -h 2',
                  shell = True)
       
 ##how to manage full .bed file summary 
