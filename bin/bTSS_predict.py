@@ -29,76 +29,73 @@ parser.add_argument('-o',
 #------------------------------------------------------------------------------
 options = parser.parse_args()
 
-records = SeqIO.read(options.i , "fasta")
+## separates names/coords
+name_delimiter = "___"
+
+split_fasta_list = []
 
 #prepare fasta sections of 500 bp for bTSSfinder 
-fastaSplit={} #create dictionary of sequence regions 
-if len(records.seq)%250 >0:
-    records.seq = records.seq + ((250-(len(records.seq)%250)) * "N")
-    for n in range(0,int((len(records.seq)/250))):
-        if n == 0:
-            query_a = records.seq[n:n+500] 
-            #print(len(query_a))
-            name =options.o+ str(n) +"_"+ str(n+500)
-            seq=str(query_a)
-            fastaSplit[name]=seq
-            
-        else:
-            query_b = records.seq[n*250:n*250+500]
-            #print(len(query_b))
-            name = options.o+ str(n*250)+"_"+ str(n*250+500) 
-            seq = str(query_b)
-            fastaSplit[name]=seq
-
-fullFastaList = []
-for key in fastaSplit:
-    fullFastaList.append(SeqRecord(Seq(fastaSplit[key]), id = key,description=""))
+for this_seq in SeqIO.parse(options.i, "fasta"):
+  for n in range(0, max(1,int((len(this_seq)/250)))):
+    start_1 = 0 + n*250
+    end_1 = min(start_1 + 500 - 1, len(this_seq))
     
+    #print(str(start_1) + "-" + str(end_1))
+    
+    split_fasta_name = name_delimiter.join([this_seq.id, str(start_1), str(end_1)])
+    split_fasta_seq  = this_seq.seq[start_1:end_1]
+
+    split_fasta_record = SeqRecord(seq = split_fasta_seq, id = split_fasta_name, description="")
+    split_fasta_list.append(split_fasta_record)
+
 #write fasta for bTSSfinder
-with open(options.o + "_summary.fasta", "w") as handle:
-    SeqIO.write(fullFastaList, handle, "fasta")
-    handle.close()
+SeqIO.write(split_fasta_list, options.o + ".split.fa", "fasta")
 
 #run bTSSfinder 
-subprocess.call('bTSSfinder -i '+ options.o + '_summary.fasta -o '+options.o+' -h 2', shell = True)
+subprocess.call('bTSSfinder -i '+ options.o + '.split.fa -o '+ options.o +' -h 2', shell = True)
       
-##how to manage full .bed file summary 
+## Read in entries from the .bed file
 bedfile_summary = open(options.o + ".bed","r")
 lines = bedfile_summary.readlines()
+entry_list = []
+
 search_coords = []
 sigma_factors = []
 start_codons = []
 sigma_site = []
 direction = []
 for line in lines:
-    data = line.strip().split('\t')
-    search_coords.append(data[0])
-    sigma_factors.append(data[3])
-    start_codons.append(data[6])
-    sigma_site.append(data[11])
-    direction.append(data[5])
-bedfile_summary.close()
+  data = line.strip().split('\t')
+  
+  start_offset = int(data[0].split(name_delimiter)[1])
     
-start_coords = [i.split('_',3)[1] for i in search_coords] 
-end_coords = [i.split('_',3)[2]for i in search_coords]
-print(end_coords)
-sigma_one = [i.split(',',1)[0] for i in sigma_site]
-sigma_two = [i.split(',',1)[1] for i in sigma_site]
+  this_minus_35_position = 0
+  this_minus_10_position = 0
+  this_sigma_factor_sites_list = data[11].split(',')
+  if len(this_sigma_factor_sites_list) > 0:
+    this_minus_35_position = this_sigma_factor_sites_list[0]
+  if len(this_sigma_factor_sites_list) > 1:
+    this_minus_10_position = this_sigma_factor_sites_list[1]
+  
+  new_entry = {
+      "sigma_factor" : data[3],
+      "strand" : data[5],
+      "TSS_position" : start_offset + int(data[6]),
+      "minus_10_position" : start_offset + int(this_minus_10_position),
+      "minus_35_position" : start_offset + int(this_minus_35_position),
+    }
+  entry_list.append(new_entry)
 
-#rectify start codon and binding sites 
-corrected_start_codon = []
-corrected_sigma_one = []
-corrected_sigma_two = []
-
-for i in range(0,len(search_coords)):
-    corrected_start_codon.append(int(start_codons[i]) + int(start_coords[i]))
-    corrected_sigma_one.append(int(sigma_one[i]) + int(start_coords[i]))
-    corrected_sigma_two.append(int(sigma_two[i]) + int(start_coords[i]))
-print(corrected_start_codon,corrected_sigma_one,corrected_sigma_two)
+bedfile_summary.close()
 
 with open(options.o + '_corrected.txt','w') as corrected_bed:
-    writer = csv.writer(corrected_bed, delimiter = '\t')
-    writer.writerows(zip(search_coords,start_coords,end_coords,sigma_factors,direction,corrected_start_codon,corrected_sigma_one,corrected_sigma_two))
+  writer = csv.DictWriter(
+      corrected_bed, 
+      delimiter = '\t',
+      fieldnames = ["sigma_factor", "strand", "TSS_position", "minus_35_position", "minus_10_position"]
+    )
+  writer.writeheader()
+  writer.writerows(entry_list)
 corrected_bed.close()
 
     
