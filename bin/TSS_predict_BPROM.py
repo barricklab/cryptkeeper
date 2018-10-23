@@ -77,66 +77,74 @@ create_split_sequence_file(
   )
 
 i=0
+sequence_length = 0
 for this_seq in SeqIO.parse(options.i, "fasta"):
   i += 1
   if (i>1):
     exit()
+  sequence_length = len(this_seq)
   SeqIO.write(this_seq, options.o + '.forward.fa', "fasta")
   SeqIO.write(this_seq.reverse_complement(), options.o + '.reverse.fa', "fasta")
 
 
 #run BPROM twice. Once for each strand. 
-subprocess.call('bprom '+ options.o + '.forward.fa -o '+ options.o +'forward.predictions.txt', shell = True)
-subprocess.call('bprom '+ options.o + '.reverse.fa -o '+ options.o +'reverse.predictions.txt', shell = True)
-
-## Parse output and create one summary file
+#subprocess.call('bprom '+ options.o + '.forward.fa -o '+ options.o +'forward.predictions.txt', shell = True)
+#subprocess.call('bprom '+ options.o + '.reverse.fa -o '+ options.o +'reverse.predictions.txt', shell = True)
 
 
-  # gff_line_list = []
-#   
-#   with open(options.o +'forward.predictions.txt') as f:
-#   ()
-# 
-# 
-#   existing_predictions = {}
-#   
-#   for line in gff_line_list:
-#   
-#     if re.match('\s?#', line):
-#       continue
-#     
-#     split_line = line.strip().split('\t')
-#     
-#     start_offset = int(split_line[0].split(name_delimiter)[1])-1
-#     
-#     # Make a dictionary for all the extra fields
-#     extra_field_list = split_line[8].split(';')
-#     extra_field_dict = {}
-#     for extra_field_item in extra_field_list:
-#       extra_field_item_list = extra_field_item.split('=')
-#       extra_field_dict[extra_field_item_list[0]] = extra_field_item_list[1]
-#   
-#     new_entry = {
-#       "promoter" : extra_field_dict["promoter"],
-#       "strand" : split_line[6],
-#       "TSSpos" : start_offset + int(split_line[4]),
-#       "score" : split_line[5],
-#       "box10pos" : start_offset + int(extra_field_dict["box10pos"]),
-#       "box35pos" : start_offset + int(extra_field_dict["box35pos"]),
-#       "box10seq" : extra_field_dict["box10seq"],
-#       "box35seq" : extra_field_dict["box35seq"],
-#       }
-#     
-#   #sort list by coordinate
-#   sorted_entry_list = sorted(entry_list, key=itemgetter('TSSpos')) 
-# 
-#   with open(options.o + '.final_predictions.tsv','w') as final_predictions_file:
-#     writer = csv.DictWriter(
-#         final_predictions_file, 
-#         delimiter = '\t',
-#         fieldnames = ["promoter", "score", "strand", "TSSpos", "box35pos", "box35seq", "box10pos", "box10seq",]
-#       )
-#     writer.writeheader()
-#     writer.writerows(sorted_entry_list)
-#   final_predictions_file.close()
-# 
+#returns a list of dictionaries for the rows
+def process_bprom_output_file(input_file_name, is_reverse_complement, sequence_length):
+  entry_list = []
+  
+  lines = []
+  with open(input_file_name) as f:
+    lines = f.readlines()
+    
+  #remove top four lines
+  lines = lines[3:len(lines)+1]
+  
+  i=0
+  new_entry = {}
+  for line in lines:
+    line = line.strip()
+    if (line == ""):
+      break
+    split_line = line.split()
+    i = i+1
+    if (i==1):
+      new_entry["promoter"] = 'sigma70';
+      new_entry["strand"] = '-' if is_reverse_complement else '+'
+      new_entry["TSSpos"] = int(split_line[2]) if not is_reverse_complement else sequence_length - int(split_line[2]) + 1
+      new_entry["score"] = split_line[4]
+    elif (i==2):
+      new_entry["box10pos"] = int(split_line[5]) if not is_reverse_complement else sequence_length - int(split_line[5]) + 1
+      new_entry["box10seq"] = split_line[6]
+    elif (i==3):
+      new_entry["box35pos"] = int(split_line[5]) if not is_reverse_complement else sequence_length - int(split_line[5]) + 1
+      new_entry["box35seq"] = split_line[6]
+    
+      entry_list.append(new_entry)
+      new_entry = {}
+      i=0
+
+  return(entry_list)
+  
+# Parse output and create one summary file
+forward_list = process_bprom_output_file(options.o +'forward.predictions.txt', False, sequence_length)
+reverse_list = process_bprom_output_file(options.o +'reverse.predictions.txt', False, sequence_length)
+final_list= forward.list.append(reverse_list)
+
+
+#sort list by coordinate
+sorted_entry_list = sorted(entry_list, key=itemgetter('TSSpos')) 
+
+with open(options.o + '.final_predictions.tsv','w') as final_predictions_file:
+  writer = csv.DictWriter(
+      final_predictions_file, 
+      delimiter = '\t',
+      fieldnames = ["promoter", "score", "strand", "TSSpos", "box35pos", "box35seq", "box10pos", "box10seq",]
+    )
+  writer.writeheader()
+  writer.writerows(sorted_entry_list)
+final_predictions_file.close()
+
