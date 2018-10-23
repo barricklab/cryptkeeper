@@ -66,15 +66,8 @@ options = parser.parse_args()
 name_delimiter = "___"
 
 
-# split into smaller FASTA for processing
-create_split_sequence_file(
-  input_file_name = options.i, 
-  output_file_name = options.o + ".split.fa",
-  window_size = options.ws,
-  window_offset = options.wo,
-  sequence_format = "fasta",
-  name_delimiter = name_delimiter,
-  )
+# Create FASTA for two strands
+# (Note that this also wraps the lines of the FASTA if needed, which is required for BROM)
 
 i=0
 sequence_length = 0
@@ -101,7 +94,7 @@ def process_bprom_output_file(input_file_name, is_reverse_complement, sequence_l
     lines = f.readlines()
     
   #remove top four lines
-  lines = lines[3:len(lines)+1]
+  lines = lines[4:len(lines)+1]
   
   i=0
   new_entry = {}
@@ -117,26 +110,25 @@ def process_bprom_output_file(input_file_name, is_reverse_complement, sequence_l
       new_entry["TSSpos"] = int(split_line[2]) if not is_reverse_complement else sequence_length - int(split_line[2]) + 1
       new_entry["score"] = split_line[4]
     elif (i==2):
-      new_entry["box10pos"] = int(split_line[5]) if not is_reverse_complement else sequence_length - int(split_line[5]) + 1
-      new_entry["box10seq"] = split_line[6]
+      new_entry["box10pos"] = int(split_line[4]) if not is_reverse_complement else sequence_length - int(split_line[4]) + 1
+      new_entry["box10seq"] = split_line[5]
     elif (i==3):
-      new_entry["box35pos"] = int(split_line[5]) if not is_reverse_complement else sequence_length - int(split_line[5]) + 1
-      new_entry["box35seq"] = split_line[6]
+      new_entry["box35pos"] = int(split_line[4]) if not is_reverse_complement else sequence_length - int(split_line[4]) + 1
+      new_entry["box35seq"] = split_line[5]
     
       entry_list.append(new_entry)
       new_entry = {}
       i=0
-
   return(entry_list)
   
 # Parse output and create one summary file
-forward_list = process_bprom_output_file(options.o +'forward.predictions.txt', False, sequence_length)
-reverse_list = process_bprom_output_file(options.o +'reverse.predictions.txt', False, sequence_length)
-final_list= forward.list.append(reverse_list)
-
+forward_list = process_bprom_output_file(options.o +'.forward.predictions.txt', False, sequence_length)
+reverse_list = process_bprom_output_file(options.o +'.reverse.predictions.txt', True, sequence_length)
+final_list = forward_list
+final_list.extend(reverse_list)
 
 #sort list by coordinate
-sorted_entry_list = sorted(entry_list, key=itemgetter('TSSpos')) 
+final_list = sorted(final_list, key=itemgetter('TSSpos')) 
 
 with open(options.o + '.final_predictions.tsv','w') as final_predictions_file:
   writer = csv.DictWriter(
@@ -145,6 +137,5 @@ with open(options.o + '.final_predictions.tsv','w') as final_predictions_file:
       fieldnames = ["promoter", "score", "strand", "TSSpos", "box35pos", "box35seq", "box10pos", "box10seq",]
     )
   writer.writeheader()
-  writer.writerows(sorted_entry_list)
+  writer.writerows(final_list)
 final_predictions_file.close()
-
