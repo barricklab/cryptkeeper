@@ -66,15 +66,8 @@ options = parser.parse_args()
 name_delimiter = "___"
 
 
-# split into smaller FASTA for processing
-create_split_sequence_file(
-  input_file_name = options.i, 
-  output_file_name = options.o + ".split.fa",
-  window_size = options.ws,
-  window_offset = options.wo,
-  sequence_format = "fasta",
-  name_delimiter = name_delimiter,
-  )
+# Create FASTA for two strands
+# (Note that this also wraps the lines of the FASTA if needed, which is required for BROM)
 
 i=0
 for this_seq in SeqIO.parse(options.i, "fasta"):
@@ -86,8 +79,8 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
 
 
 #run BPROM twice. Once for each strand. 
-subprocess.call('bprom '+ options.o + '.forward.fa -o '+ options.o +'forward.predictions.txt', shell = True)
-subprocess.call('bprom '+ options.o + '.reverse.fa -o '+ options.o +'reverse.predictions.txt', shell = True)
+subprocess.call('bprom '+ options.o + '.forward.fa '+ options.o +'.forward.predictions.txt', shell = True)
+subprocess.call('bprom '+ options.o + '.reverse.fa '+ options.o +'.reverse.predictions.txt', shell = True)
 
 ## Parse output and create one summary file
 
