@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 
@@ -27,6 +27,9 @@ import Bio
 from Bio import SeqIO
 from Bio.Alphabet import generic_dna
 import csv
+import subprocess
+from operator import itemgetter
+
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='import fasta file for RBS calculation')
@@ -46,7 +49,6 @@ parser.add_argument('-o',
 ##------------------------------------------------------------------------------
 options = parser.parse_args()
 
-command = "RBSCal
 
 i=0
 sequence_length = 0
@@ -58,11 +60,11 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
   if (i>1):
     exit()
   sequence_length = len(this_seq)
-  forward_seq = str(this_seq)
-  reverse_seq = str(this_seq.reverse_complement())
+  forward_seq = str(this_seq.seq)
+  reverse_seq = str(this_seq.reverse_complement().seq)
 
 
-#run RBS Calculator twice. Once for each strand. 
+#run RBS Calculator twice. Once for each strand.
 subprocess.call('Run_RBS_Calculator.py ' + forward_seq + ' > ' + options.o + '.forward.predictions.txt', shell = True)
 subprocess.call('Run_RBS_Calculator.py '+ reverse_seq + ' > ' + options.o + '.reverse.predictions.txt', shell = True)
 
@@ -74,19 +76,19 @@ def process_RBS_calculator_output_file(input_file_name, is_reverse_complement, s
   with open(input_file_name) as f:
     lines = f.readlines()
       
-  for line in lines
+  for line in lines:
     line = line.strip()
     if (line == ""):
       continue
     split_line = line.split()
-    if len(split_line) != 3
+    if len(split_line) != 3:
       continue
     
     new_entry = {}
     new_entry["position"] =  int(split_line[0]) if not is_reverse_complement else sequence_length - int(split_line[0]) + 1;
     new_entry["strand"] = '-' if is_reverse_complement else '+'
-    new_entry["score"] = split_line[0]
-    new_entry["score2"] = split_line[1]
+    new_entry["score"] = split_line[1]
+    new_entry["score2"] = split_line[2]
     entry_list.append(new_entry)
       
   return(entry_list)
@@ -98,7 +100,7 @@ final_list = forward_list
 final_list.extend(reverse_list)
 
 # Sort list by coordinate
-final_list = sorted(final_list, key=itemgetter('TSSpos')) 
+final_list = sorted(final_list, key=itemgetter('position')) 
 
 with open(options.o + '.predictions.tsv','w') as final_predictions_file:
   writer = csv.DictWriter(
