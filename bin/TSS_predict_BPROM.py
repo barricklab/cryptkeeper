@@ -36,30 +36,6 @@ parser.add_argument(
 
 #------------------------------------------------------------------------------
 
-#Generic function for splitting input sequence file
-def create_split_sequence_file(input_file_name, output_file_name, window_size = 10000, window_offset = 10000, sequence_format="fasta", name_delimiter="___"):
-
-  split_fasta_list = []
-
-  for this_seq in SeqIO.parse(input_file_name, sequence_format):
-    for n in range(0, max(1,int((len(this_seq)/window_offset)))):
-      start_0_indexed = 0 + n*window_offset
-      end_0_indexed = min(start_0_indexed + window_size - 1, len(this_seq))
-    
-      #print(str(start_1) + "-" + str(end_1))
-    
-      split_fasta_name = name_delimiter.join([this_seq.id, str(start_0_indexed+1), str(end_0_indexed+1)])
-      split_fasta_seq  = this_seq.seq[start_0_indexed:end_0_indexed+1]
-
-      split_fasta_record = SeqRecord(seq = split_fasta_seq, id = split_fasta_name, description="")
-      split_fasta_list.append(split_fasta_record)
-
-  #write split sequence file
-  SeqIO.write(split_fasta_list, output_file_name, sequence_format)
-
-
-#------------------------------------------------------------------------------
-
 options = parser.parse_args()
 
 ## global setting - separates names/coords
@@ -81,8 +57,8 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
 
 
 #run BPROM twice. Once for each strand. 
-#subprocess.call('bprom '+ options.o + '.forward.fa -o '+ options.o +'forward.predictions.txt', shell = True)
-#subprocess.call('bprom '+ options.o + '.reverse.fa -o '+ options.o +'reverse.predictions.txt', shell = True)
+subprocess.call('bprom '+ options.o + '.forward.fa -o '+ options.o +'forward.predictions.txt', shell = True)
+subprocess.call('bprom '+ options.o + '.reverse.fa -o '+ options.o +'reverse.predictions.txt', shell = True)
 
 
 #returns a list of dictionaries for the rows
