@@ -85,7 +85,11 @@ def process_RBS_calculator_output_file(input_file_name, is_reverse_complement, s
       continue
     
     new_entry = {}
-    new_entry["position"] =  int(split_line[0]) if not is_reverse_complement else sequence_length - int(split_line[0]) + 1;
+    
+    # RBS calculator returns 0-indexed positions
+    pos_1 = int(split_line[0]) + 1
+    new_entry["position"] =  pos_1 if not is_reverse_complement else sequence_length - pos_1 + 1;
+    new_entry["start_codon"] =  forward_seq[pos_1-1:pos_1+1] if not is_reverse_complement else reverse_seq[pos_1-1:pos_1+1];
     new_entry["strand"] = '-' if is_reverse_complement else '+'
     new_entry["score"] = split_line[1]
     new_entry["score2"] = split_line[2]
@@ -102,11 +106,10 @@ final_list.extend(reverse_list)
 # Sort list by coordinate
 final_list = sorted(final_list, key=itemgetter('position')) 
 
-with open(options.o + '.predictions.tsv','w') as final_predictions_file:
+with open(options.o,'w') as final_predictions_file:
   writer = csv.DictWriter(
       final_predictions_file, 
-      delimiter = '\t',
-      fieldnames = ["position", "strand", "score", "score2"]
+      fieldnames = ["position", "strand", "start_codon", "score", "score2"]
     )
   writer.writeheader()
   writer.writerows(final_list)

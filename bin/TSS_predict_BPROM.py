@@ -113,10 +113,9 @@ final_list.extend(reverse_list)
 #sort list by coordinate
 final_list = sorted(final_list, key=itemgetter('TSSpos')) 
 
-with open(options.o + '.final_predictions.tsv','w') as final_predictions_file:
+with open(options.o,'w') as final_predictions_file:
   writer = csv.DictWriter(
-      final_predictions_file, 
-      delimiter = '\t',
+      final_predictions_file,
       fieldnames = ["promoter", "score", "strand", "TSSpos", "box35pos", "box35seq", "box10pos", "box10seq",]
     )
   writer.writeheader()

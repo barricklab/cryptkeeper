@@ -137,10 +137,9 @@ final_list = process_Trans_Term_calculator_output_file(options.o +'.predictions.
 # Sort list by coordinate
 final_list = sorted(final_list, key=itemgetter('start')) 
 
-with open(options.o + '.predictions.tsv','w') as final_predictions_file:
+with open(options.o,'w') as final_predictions_file:
   writer = csv.DictWriter(
       final_predictions_file, 
-      delimiter = '\t',
       fieldnames = ["start", "end", "strand", "conf", "hairpin_score", "tail_score", "seq_upstream", "seq_hairpin_open", "seq_hairpin_loop", "seq_hairpin_close", "seq_tail"]
     )
   writer.writeheader()

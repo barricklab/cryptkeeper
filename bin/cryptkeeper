@@ -19,6 +19,10 @@ import subprocess
 import csv
 from operator import itemgetter
 
+import plotly
+import plotly.graph_objs as go
+
+
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='input fasta')
@@ -45,8 +49,11 @@ parser.add_argument(
 
 options = parser.parse_args()
 
+input_fasta_file = options.i
+
 # Predict promoters
-tss_command = 'TSS_predict_BPROM.py -i ' + options.i + ' -o ' + options.o + '.TSS'
+tss_prediction_file_name = options.o + '.TSS.tsv'
+tss_command = 'TSS_predict_BPROM.py -i ' + input_fasta_file + ' -o ' + tss_prediction_file_name
 print(tss_command)
 try:
   subprocess.check_call([tss_command], shell=True)
@@ -58,7 +65,8 @@ except OSError as e:
   pass
 
 # Predict terminators
-rit_command = 'RIT_predict_TransTerm.py -i ' + options.i + ' -o ' + options.o + '.RIT'
+rit_prediction_file_name = options.o + '.RIT.tsv'
+rit_command = 'RIT_predict_TransTerm.py -i ' + input_fasta_file + ' -o ' + rit_prediction_file_name
 print(rit_command)
 try:
   subprocess.check_call([rit_command], shell=True)
@@ -66,13 +74,72 @@ except subprocess.CalledProcessError as e:
   print(e)
 
 # Predict RBS
-rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + options.i + ' -o ' + options.o + '.RBS'
+rbs_prediction_file_name = options.o + '.RBS.tsv'
+rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + input_fasta_file + ' -o ' + rbs_prediction_file_name
 print(rbs_command)
-subprocess.call(rbs_command, shell=True)
+try:
+  subprocess.check_call(rbs_command, shell=True)
+except subprocess.CalledProcessError as e:
+  print(e)
+  pass
+except OSError as e:
+  print(e)
+  pass
 
 # Predict ORFs
 
+# Load predictions
+
+tss_predictions = []
+tss_reader = csv.DictReader(tss_prediction_file_name)
+for row in tss_reader:
+  tss_predictions.append(row)
+  
+rit_predictions = []
+rit_reader = csv.DictReader(rit_prediction_file_name)
+for row in rit_reader:
+  tss_predictions.append(row)
+  
+rbs_predictions = []
+rbs_reader = csv.DictReader(rbs_prediction_file_name)
+for row in tss_reader:
+  tss_predictions.append(row)
+  
 # Filter predictions
 
 # Display predictions
 
+tss_series = go.Scatter(
+  x = [d['TSSpos'] for d in tss_predictions],
+  y = [d['score'] for d in tss_predictions],
+  mode = 'markers',
+  name = 'TSS'
+  yaxis='y1'
+  transforms = [dict(
+    type = 'groupby',
+    groups = [d['strand'] for d in tss_predictions],
+    styles = [
+      dict(target = '+', value = dict(marker = dict(color = 'black'))),
+      dict(target = '-', value = dict(marker = dict(color = 'red'))),
+    ]
+  )]
+)
+
+rit_series = go.Scatter(
+  x = [d['start'] for d in rit_predictions],
+  y = [d['conf'] for d in rit_predictions],
+  mode = 'markers',
+  name = 'RIT'
+  yaxis='y2'
+)
+
+rbs_series = go.Scatter(
+  x = [d['position'] for d in rbs_predictions],
+  y = [d['score'] for d in rbs_predictions],
+  mode = 'markers',
+  name = 'RBS'
+  yaxis='y3'
+)
+
+data = [tss_series, rit_series, rbs_series]
+plotly.offline.plot(data, filename= options.o + '.plot.html')

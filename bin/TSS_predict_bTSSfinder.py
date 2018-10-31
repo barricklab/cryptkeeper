@@ -197,10 +197,9 @@ elif (mode=="GFF"):
   #sort list by coordinate
   sorted_entry_list = sorted(entry_list, key=itemgetter('TSSpos')) 
 
-  with open(options.o + '.final_predictions.tsv','w') as final_predictions_file:
+  with open(options.o,'w') as final_predictions_file:
     writer = csv.DictWriter(
         final_predictions_file, 
-        delimiter = '\t',
         fieldnames = ["promoter", "score", "strand", "TSSpos", "box35pos", "box35seq", "box10pos", "box10seq",]
       )
     writer.writeheader()
