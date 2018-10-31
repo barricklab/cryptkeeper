@@ -41,6 +41,7 @@ options = parser.parse_args()
 ## global setting - separates names/coords
 name_delimiter = "___"
 
+print(options)
 
 # Create FASTA for two strands
 # (Note that this also wraps the lines of the FASTA if needed, which is required for BROM)
@@ -57,8 +58,14 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
 
 
 #run BPROM twice. Once for each strand. 
-subprocess.call('bprom '+ options.o + '.forward.fa -o '+ options.o +'forward.predictions.txt', shell = True)
-subprocess.call('bprom '+ options.o + '.reverse.fa -o '+ options.o +'reverse.predictions.txt', shell = True)
+
+bprom_command_1 = 'bprom '+ options.o + '.forward.fa '+ options.o +'.forward.predictions.txt'
+print(bprom_command_1)
+subprocess.call(bprom_command_1, shell = True)
+
+bprom_command_2 = 'bprom '+ options.o + '.reverse.fa '+ options.o +'.reverse.predictions.txt'
+print(bprom_command_2)
+subprocess.call(bprom_command_2, shell = True)
 
 
 #returns a list of dictionaries for the rows

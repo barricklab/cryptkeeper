@@ -46,13 +46,29 @@ parser.add_argument(
 options = parser.parse_args()
 
 # Predict promoters
-subprocess.call('TSS_predict_BPROM.py -i ' + opt.i + ' -o ' + opt.o + 'TSS')
+tss_command = 'TSS_predict_BPROM.py -i ' + options.i + ' -o ' + options.o + '.TSS'
+print(tss_command)
+try:
+  subprocess.check_call([tss_command], shell=True)
+except subprocess.CalledProcessError as e:
+  print(e)
+  pass
+except OSError as e:
+  print(e)
+  pass
 
 # Predict terminators
-subprocess.call('RIT_predict_TransTerm.py -i ' + opt.i + ' -o ' + opt.o + 'RIT')
+rit_command = 'RIT_predict_TransTerm.py -i ' + options.i + ' -o ' + options.o + '.RIT'
+print(rit_command)
+try:
+  subprocess.check_call([rit_command], shell=True)
+except subprocess.CalledProcessError as e:
+  print(e)
 
 # Predict RBS
-subprocess.call('RBS_Predict_RBS_Calculator.py -i ' + opt.i + ' -o ' + opt.o + 'RBS')
+rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + options.i + ' -o ' + options.o + '.RBS'
+print(rbs_command)
+subprocess.call(rbs_command, shell=True)
 
 # Predict ORFs
 

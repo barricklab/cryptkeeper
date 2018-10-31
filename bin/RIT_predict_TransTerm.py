@@ -66,11 +66,11 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
 
 #unique step, create dummy cords files so that entire sequence is downstream of genes on both strands
 with open(options.o + '.dummy.coords','w') as dummy_coords_file:
-  dummy_coords_file.write('gene1 1 1 ' + main_seq.id + '\n')
+  dummy_coords_file.write('gene1 1 2 ' + main_seq.id + '\n')
   dummy_coords_file.write('gene2 ' + str(len(main_seq)) + ' ' + str(len(main_seq)-1) + ' ' + main_seq.id + '\n')
 
 #run once for predictions on both strands
-print('transterm  -p $TRANSTERM_EXPDAT_PATH' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
+print('transterm  -p $TRANSTERM_EXPDAT_PATH ' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
 subprocess.call('transterm  -p $TRANSTERM_EXPDAT_PATH ' + options.i + ' ' + options.o + '.dummy.coords > ' + options.o + '.predictions.txt', shell = True)
 
 #returns a list of dictionaries for the rows
@@ -118,11 +118,11 @@ def process_Trans_Term_calculator_output_file(input_file_name):
 
     new_entry["strand"] =  split_line[5] #either '+' or '-'
     if new_entry["strand"] == '+':
-      new_entry["start"] = split_line[2]
-      new_entry["end"] = split_line[4]
+      new_entry["start"] = int(split_line[2])
+      new_entry["end"] = int(split_line[4])
     else:
-      new_entry["start"] = split_line[4]
-      new_entry["end"] = split_line[2]
+      new_entry["start"] = int(split_line[4])
+      new_entry["end"] = int(split_line[2])
     
     new_entry["conf"] = split_line[7]
     new_entry["hairpin_score"] = split_line[8]
