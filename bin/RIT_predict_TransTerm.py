@@ -25,7 +25,7 @@ from Bio.SeqRecord import SeqRecord
 import subprocess
 import csv
 from operator import itemgetter
-
+import os.environment
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='input fasta')
@@ -69,9 +69,15 @@ with open(options.o + '.dummy.coords','w') as dummy_coords_file:
   dummy_coords_file.write('gene1 1 2 ' + main_seq.id + '\n')
   dummy_coords_file.write('gene2 ' + str(len(main_seq)) + ' ' + str(len(main_seq)-1) + ' ' + main_seq.id + '\n')
 
+transterm_expdat_path = ''
+if "TRANSTERM_EXPDAT_PATH" in os.environ:
+  transterm_expdat_path = os.getenv("TRANSTERM_EXPDAT_PATH")
+else:
+  sys.exit("Must define environmental variable $TRANSTERM_EXPDAT_PATH")
+
 #run once for predictions on both strands
-print('transterm  -p $TRANSTERM_EXPDAT_PATH ' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
-subprocess.call('transterm  -p $TRANSTERM_EXPDAT_PATH ' + options.i + ' ' + options.o + '.dummy.coords > ' + options.o + '.predictions.txt', shell = True)
+print('transterm  -p ' + transterm_expdat_path + ' ' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
+subprocess.call('transterm  -p ' + transterm_expdat_path + ' ' + options.i + ' ' + options.o + '.dummy.coords > ' + options.o + '.predictions.txt', shell = True)
 
 #returns a list of dictionaries for the rows
 

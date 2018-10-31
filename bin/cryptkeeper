@@ -44,6 +44,12 @@ parser.add_argument(
     help="output file prefix",
     )
     
+parser.add_argument(
+    '-p',
+    action='store_true',
+    dest='plot_only',
+    help="plot mode, assumes output files all exist",
+    )
 
 #------------------------------------------------------------------------------
 
@@ -53,68 +59,70 @@ input_fasta_file = options.i
 
 # Predict promoters
 tss_prediction_file_name = options.o + '.TSS.tsv'
-tss_command = 'TSS_predict_BPROM.py -i ' + input_fasta_file + ' -o ' + tss_prediction_file_name
-print(tss_command)
-try:
-  subprocess.check_call([tss_command], shell=True)
-except subprocess.CalledProcessError as e:
-  print(e)
-  pass
-except OSError as e:
-  print(e)
-  pass
+
+if not options.plot_only:
+  tss_command = 'TSS_predict_BPROM.py -i ' + input_fasta_file + ' -o ' + tss_prediction_file_name
+  print(tss_command)
+  try:
+    subprocess.check_call([tss_command], shell=True)
+  except subprocess.CalledProcessError as e:
+    print(e)
+  except OSError as e:
+    print(e)
 
 # Predict terminators
 rit_prediction_file_name = options.o + '.RIT.tsv'
-rit_command = 'RIT_predict_TransTerm.py -i ' + input_fasta_file + ' -o ' + rit_prediction_file_name
-print(rit_command)
-try:
-  subprocess.check_call([rit_command], shell=True)
-except subprocess.CalledProcessError as e:
-  print(e)
+
+if not options.plot_only:
+  rit_command = 'RIT_predict_TransTerm.py -i ' + input_fasta_file + ' -o ' + rit_prediction_file_name
+  print(rit_command)
+  try:
+    subprocess.check_call([rit_command], shell=True)
+  except subprocess.CalledProcessError as e:
+    print(e)
 
 # Predict RBS
 rbs_prediction_file_name = options.o + '.RBS.tsv'
-rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + input_fasta_file + ' -o ' + rbs_prediction_file_name
-print(rbs_command)
-try:
-  subprocess.check_call(rbs_command, shell=True)
-except subprocess.CalledProcessError as e:
-  print(e)
-  pass
-except OSError as e:
-  print(e)
-  pass
+
+if not options.plot_only:
+  rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + input_fasta_file + ' -o ' + rbs_prediction_file_name
+  print(rbs_command)
+  try:
+    subprocess.check_call(rbs_command, shell=True)
+  except subprocess.CalledProcessError as e:
+    print(e)
+  except OSError as e:
+    print(e)
 
 # Predict ORFs
 
 # Load predictions
 
 tss_predictions = []
-tss_reader = csv.DictReader(tss_prediction_file_name)
+tss_reader = csv.DictReader(open(tss_prediction_file_name))
 for row in tss_reader:
   tss_predictions.append(row)
   
 rit_predictions = []
-rit_reader = csv.DictReader(rit_prediction_file_name)
+rit_reader = csv.DictReader(open(rit_prediction_file_name))
 for row in rit_reader:
-  tss_predictions.append(row)
+  rit_predictions.append(row)
   
 rbs_predictions = []
-rbs_reader = csv.DictReader(rbs_prediction_file_name)
-for row in tss_reader:
-  tss_predictions.append(row)
+rbs_reader = csv.DictReader(open(rbs_prediction_file_name))
+for row in rbs_reader:
+  rbs_predictions.append(row)
   
 # Filter predictions
 
 # Display predictions
-
+print(tss_predictions)
 tss_series = go.Scatter(
   x = [d['TSSpos'] for d in tss_predictions],
   y = [d['score'] for d in tss_predictions],
   mode = 'markers',
-  name = 'TSS'
-  yaxis='y1'
+  name = 'TSS',
+  yaxis='y1',
   transforms = [dict(
     type = 'groupby',
     groups = [d['strand'] for d in tss_predictions],
@@ -122,23 +130,26 @@ tss_series = go.Scatter(
       dict(target = '+', value = dict(marker = dict(color = 'black'))),
       dict(target = '-', value = dict(marker = dict(color = 'red'))),
     ]
-  )]
+  )],
+  symbol='square'
 )
 
 rit_series = go.Scatter(
   x = [d['start'] for d in rit_predictions],
   y = [d['conf'] for d in rit_predictions],
   mode = 'markers',
-  name = 'RIT'
-  yaxis='y2'
+  name = 'RIT',
+  yaxis='y2',
+  symbol='diamond'
 )
 
 rbs_series = go.Scatter(
   x = [d['position'] for d in rbs_predictions],
   y = [d['score'] for d in rbs_predictions],
   mode = 'markers',
-  name = 'RBS'
-  yaxis='y3'
+  name = 'RBS',
+  yaxis='y3',
+  symbol='circle'
 )
 
 data = [tss_series, rit_series, rbs_series]
