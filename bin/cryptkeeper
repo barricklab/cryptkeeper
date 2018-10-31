@@ -21,7 +21,7 @@ from operator import itemgetter
 
 import plotly
 import plotly.graph_objs as go
-
+import numpy
 
 
 #------------------------------------------------------------------------------
@@ -55,13 +55,13 @@ parser.add_argument(
 
 options = parser.parse_args()
 
-input_fasta_file = options.i
+input_fasta_file_name = options.i
 
 # Predict promoters
 tss_prediction_file_name = options.o + '.TSS.tsv'
 
 if not options.plot_only:
-  tss_command = 'TSS_predict_BPROM.py -i ' + input_fasta_file + ' -o ' + tss_prediction_file_name
+  tss_command = 'TSS_predict_BPROM.py -i ' + input_fasta_file_name + ' -o ' + tss_prediction_file_name
   print(tss_command)
   try:
     subprocess.check_call([tss_command], shell=True)
@@ -74,7 +74,7 @@ if not options.plot_only:
 rit_prediction_file_name = options.o + '.RIT.tsv'
 
 if not options.plot_only:
-  rit_command = 'RIT_predict_TransTerm.py -i ' + input_fasta_file + ' -o ' + rit_prediction_file_name
+  rit_command = 'RIT_predict_TransTerm.py -i ' + input_fasta_file_name + ' -o ' + rit_prediction_file_name
   print(rit_command)
   try:
     subprocess.check_call([rit_command], shell=True)
@@ -85,7 +85,7 @@ if not options.plot_only:
 rbs_prediction_file_name = options.o + '.RBS.tsv'
 
 if not options.plot_only:
-  rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + input_fasta_file + ' -o ' + rbs_prediction_file_name
+  rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + input_fasta_file_name + ' -o ' + rbs_prediction_file_name
   print(rbs_command)
   try:
     subprocess.check_call(rbs_command, shell=True)
@@ -111,46 +111,134 @@ for row in rit_reader:
 rbs_predictions = []
 rbs_reader = csv.DictReader(open(rbs_prediction_file_name))
 for row in rbs_reader:
+  row["score"] = numpy.log10(float(row["score"]))
   rbs_predictions.append(row)
   
+  
+rbs_predictions = filter(lambda x:float(x["score"]) > 2, rbs_predictions)
+
 # Filter predictions
 
 # Display predictions
-print(tss_predictions)
+
+
+#settings
+TSS_color = '#2ab717'
+RIT_color = '#ff0000'
+RBS_color = '#0d30e0'
+marker_size = 20
+
 tss_series = go.Scatter(
   x = [d['TSSpos'] for d in tss_predictions],
   y = [d['score'] for d in tss_predictions],
   mode = 'markers',
   name = 'TSS',
-  yaxis='y1',
-  transforms = [dict(
-    type = 'groupby',
-    groups = [d['strand'] for d in tss_predictions],
-    styles = [
-      dict(target = '+', value = dict(marker = dict(color = 'black'))),
-      dict(target = '-', value = dict(marker = dict(color = 'red'))),
-    ]
-  )],
-  symbol='square'
+
+  
+  marker = dict(
+    symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in tss_predictions],
+    size=marker_size,
+    color=TSS_color,
+  ),
+  
+  error_y=dict(
+            type='data',
+            array=[0],
+            arrayminus=[d['score'] for d in tss_predictions],
+            width=0,
+            color=TSS_color,
+        )
 )
 
 rit_series = go.Scatter(
-  x = [d['start'] for d in rit_predictions],
-  y = [d['conf'] for d in rit_predictions],
+  x = [e['start'] for e in rit_predictions],
+  y = [e['conf'] for e in rit_predictions],
   mode = 'markers',
   name = 'RIT',
   yaxis='y2',
-  symbol='diamond'
+  marker = dict(
+    symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in rit_predictions],
+    size=marker_size,
+    color=RIT_color,
+  ),
+  error_y=dict(
+          type='data',
+          array=[0],
+          arrayminus=[e['conf'] for e in rit_predictions],
+          width=0,
+          color=RIT_color,
+      )
 )
 
 rbs_series = go.Scatter(
-  x = [d['position'] for d in rbs_predictions],
-  y = [d['score'] for d in rbs_predictions],
+  x = [f['position'] for f in rbs_predictions],
+  y = [f['score'] for f in rbs_predictions],
   mode = 'markers',
   name = 'RBS',
   yaxis='y3',
-  symbol='circle'
+  marker = dict(
+    symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in rbs_predictions],
+    size=marker_size,
+    color=RBS_color,
+  ),
+  error_y=dict(
+          type='data',
+          array=[0],
+          arrayminus=[f['score'] for f in rbs_predictions],
+          width=0,
+          color=RBS_color,
+      )
 )
 
+layout = go.Layout(
+  title='cryptkeeper results: ' + input_fasta_file_name,
+  
+  xaxis=dict(
+        domain=[0.18, 1.0]
+  ),
+  yaxis=dict(
+    title='TSS score',
+    range = [0, 10],
+    titlefont=dict(
+        color=TSS_color
+    ),
+    tickfont=dict(
+        color=TSS_color
+    )
+  ),
+  yaxis2=dict(
+      title='RIT score',
+      range = [0, 105],
+      titlefont=dict(
+          color=RIT_color
+      ),
+      tickfont=dict(
+          color=RIT_color
+      ),
+      anchor='free',
+      overlaying='y',
+      side='left',
+      position=0.06,
+  ),
+  yaxis3=dict(
+      title='log10 RBS score',
+      range = [2, 5],
+      titlefont=dict(
+          color=RBS_color
+      ),
+      tickfont=dict(
+          color=RBS_color
+      ),
+      anchor='free',
+      overlaying='y',
+      side='left',
+      position=0.12,
+  ),
+)
+
+#data = [tss_series, rit_series, rbs_series]
 data = [tss_series, rit_series, rbs_series]
-plotly.offline.plot(data, filename= options.o + '.plot.html')
+
+fig = dict( data=data, layout=layout )
+
+plotly.offline.plot(fig, filename= options.o + '.plot.html')
