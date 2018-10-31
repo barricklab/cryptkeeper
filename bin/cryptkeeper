@@ -58,7 +58,7 @@ options = parser.parse_args()
 input_fasta_file_name = options.i
 
 # Predict promoters
-tss_prediction_file_name = options.o + '.TSS.tsv'
+tss_prediction_file_name = options.o + '.TSS.csv'
 
 if not options.plot_only:
   tss_command = 'TSS_predict_BPROM.py -i ' + input_fasta_file_name + ' -o ' + tss_prediction_file_name
@@ -71,7 +71,7 @@ if not options.plot_only:
     print(e)
 
 # Predict terminators
-rit_prediction_file_name = options.o + '.RIT.tsv'
+rit_prediction_file_name = options.o + '.RIT.csv'
 
 if not options.plot_only:
   rit_command = 'RIT_predict_TransTerm.py -i ' + input_fasta_file_name + ' -o ' + rit_prediction_file_name
@@ -82,7 +82,7 @@ if not options.plot_only:
     print(e)
 
 # Predict RBS
-rbs_prediction_file_name = options.o + '.RBS.tsv'
+rbs_prediction_file_name = options.o + '.RBS.csv'
 
 if not options.plot_only:
   rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + input_fasta_file_name + ' -o ' + rbs_prediction_file_name
