@@ -53,8 +53,8 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
   if (i>1):
     exit()
   sequence_length = len(this_seq)
-  SeqIO.write(this_seq, options.o + '.forward.fa', "fasta")
-  SeqIO.write(this_seq.reverse_complement(), options.o + '.reverse.fa', "fasta")
+  SeqIO.write(this_seq.upper(), options.o + '.forward.fa', "fasta")
+  SeqIO.write(this_seq.reverse_complement().upper(), options.o + '.reverse.fa', "fasta")
 
 
 #run BPROM twice. Once for each strand. 

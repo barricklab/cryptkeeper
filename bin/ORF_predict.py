@@ -57,7 +57,7 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
   i += 1
   if (i>1):
     exit()
-  main_seq = this_seq
+  main_seq = this_seq.upper()
   
 
 def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
@@ -71,7 +71,7 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
   if (translation_table_id==11):
     translation_table.start_codons = ['ATG', 'GTG', 'TTG']
   
-  print(translation_table.start_codons)
+  #print(translation_table.start_codons)
   
   for this_strand, this_seq in [('+', seq), ('-', seq.reverse_complement())]:
     for start_pos_0 in range(len(this_seq)- 2):
@@ -96,7 +96,7 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
       if aa_length < minimum_orf_aa_length:
         continue
       
-      print(str(this_strand) + " " + str(start_pos_0))
+      #print(str(this_strand) + " " + str(start_pos_0))
       
       if (this_strand == '-'):
         start_pos_1 = len(this_seq) - start_pos_1 + 1

@@ -81,11 +81,25 @@ if not options.plot_only:
   except subprocess.CalledProcessError as e:
     print(e)
 
+# Predict ORFs
+
+orf_prediction_file_name = options.o + '.ORF.csv'
+
+if not options.plot_only:
+  orf_command = 'ORF_predict.py -i ' + input_fasta_file_name + ' -o ' + orf_prediction_file_name
+  print(orf_command)
+  try:
+    subprocess.check_call(orf_command, shell=True)
+  except subprocess.CalledProcessError as e:
+    print(e)
+  except OSError as e:
+    print(e)
+
 # Predict RBS
 rbs_prediction_file_name = options.o + '.RBS.csv'
 
 if not options.plot_only:
-  rbs_command = 'RBS_Predict_RBS_Calculator.py -i ' + input_fasta_file_name + ' -o ' + rbs_prediction_file_name
+  rbs_command = 'RBS_predict_RBS_Calculator.py -i ' + input_fasta_file_name + ' -o ' + rbs_prediction_file_name + ' -s ' + orf_prediction_file_name
   print(rbs_command)
   try:
     subprocess.check_call(rbs_command, shell=True)
@@ -94,7 +108,6 @@ if not options.plot_only:
   except OSError as e:
     print(e)
 
-# Predict ORFs
 
 # Load predictions
 

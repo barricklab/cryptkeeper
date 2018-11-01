@@ -62,7 +62,7 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
   i += 1
   if (i>1):
     exit()
-  main_seq = this_seq
+  main_seq = this_seq.upper()
 
 #unique step, create dummy cords files so that entire sequence is downstream of genes on both strands
 with open(options.o + '.dummy.coords','w') as dummy_coords_file:
