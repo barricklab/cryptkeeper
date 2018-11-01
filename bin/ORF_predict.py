@@ -11,6 +11,10 @@ Code adapted from Biopython 1.72 tutorial and cookbook, 20.1.13
 import argparse
 import Bio
 from Bio import SeqIO
+import Bio.Data.CodonTable
+from operator import itemgetter
+import csv
+
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='import fasta for ORF detection')
@@ -33,9 +37,9 @@ parser.add_argument('-l',
     action='store', 
     dest='l',
     required=False,
-    default=100,
+    default=30,
     type=str,
-    help="set minimum protein length of translated product")
+    help="set minimum length of protein (in amino acids)")
 
 parser.add_argument('-o', 
     action='store',
@@ -45,49 +49,79 @@ parser.add_argument('-o',
     help="outfile prefix")
 #------------------------------------------------------------------------------
 options = parser.parse_args()
-records = SeqIO.read(options.i,"fasta")
-table = options.t #NCBI translation table for Bacterial, Archaeal, and Plant Plastids
-min_pro_len = options.l 
+translation_table_id = options.t #NCBI translation table for Bacterial, Archaeal, and Plant Plastids
+minimum_orf_aa_length = options.l 
 
+i=0
+for this_seq in SeqIO.parse(options.i, "fasta"):
+  i += 1
+  if (i>1):
+    exit()
+  main_seq = this_seq
+  
 
-#length of sequence = multiple of 3
-#if len(records.seq)%3 >0:
-#    records.seq = records.seq + ((3-(len(records.seq)%3)) * "N")
+def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
+  orfs = []
+  seq_len = len(seq)
+  
+  #Get the codon table so we know the valid start codons
+  translation_table = Bio.Data.CodonTable.unambiguous_dna_by_id[translation_table_id]
+
+  #ignore ultra-rare "UUG" "GUG" start codons (which are not recognized by RBS Calculator)
+  if (translation_table_id==11):
+    translation_table.start_codons = ['ATG', 'GTG', 'TTG']
+  
+  print(translation_table.start_codons)
+  
+  for this_strand, this_seq in [('+', seq), ('-', seq.reverse_complement())]:
+    for start_pos_0 in range(len(this_seq)- 2):
     
-def find_orfs_with_trans(seq, trans_table, min_protein_length):
-    answer = []
-    seq_len = len(seq)
-    for strand, nuc in [(+1, seq), (-1, seq.reverse_complement())]:
-        for frame in range(3):
-            trans = nuc[frame:].translate(trans_table)
-            trans_len = len(trans)
-            aa_start = 0
-            aa_end = 0
-            while aa_start < trans_len:
-                aa_end = trans.find("*", aa_start)
-                if aa_end == -1:
-                    aa_end = trans_len
-                if aa_end-aa_start >= min_protein_length:
-                    if strand == 1:
-                        start = frame+aa_start*3
-                        end = min(seq_len,frame+aa_end*3+3)
-                    else:
-                        start = seq_len-frame-aa_end*3-3
-                        end = seq_len-frame-aa_start*3
-                    answer.append((start, end, strand,
-                                   trans[aa_start:aa_end]))
-                aa_start = aa_end+1
-    answer.sort()
-    return answer
+      #print(this_seq[start_pos_0:start_pos_0+3].seq)
+      
+      #Is this a start codon?
+      this_start_codon = this_seq[start_pos_0:start_pos_0+3].seq
+      if (this_start_codon not in translation_table.start_codons):
+        continue
+      
+      start_pos_1 = start_pos_0+1
+      
+      #print(this_seq[start_pos_0:])
+      aa_sequence = this_seq[start_pos_0:].seq.translate(translation_table, to_stop=True)
+      #print(aa_sequence)
+      aa_length = len(aa_sequence)
+      
+      end_pos_1 = start_pos_1 + aa_length*3 - 1
+      
+      #Is it a long enough reading frame?
+      if aa_length < minimum_orf_aa_length:
+        continue
+      
+      print(str(this_strand) + " " + str(start_pos_0))
+      
+      if (this_strand == '-'):
+        start_pos_1 = len(this_seq) - start_pos_1 + 1
+        end_pos_1 = len(this_seq) - end_pos_1 + 1
+        start_pos_1, end_pos_1 = end_pos_1, start_pos_1
+      
+      orfs.append(dict(
+        start = start_pos_1, 
+        end = end_pos_1,
+        strand = this_strand,
+        start_codon = this_start_codon,
+        length = aa_length
+        ))
+        
+  orfs = sorted(orfs, key=itemgetter('start')) 
+  return orfs
 
-orf_list = find_orfs_with_trans(records.seq, table, min_pro_len)
+orfs = find_orfs(main_seq, translation_table_id, minimum_orf_aa_length)
 
 #write each tuple of list to outfile
-with open(options.o +'.txt','w') as outfile:
-    outfile.write('\n'.join("%s...%s - length %i, strand %i, %i:%i" \
-    % (pro[:30], pro[-3:], len(pro), strand, start, end) for (start, end, strand, pro) in orf_list))
-    outfile.close()
-    
-    
-    
-    
+with open(options.o,'w') as final_predictions_file:
+  writer = csv.DictWriter(
+      final_predictions_file,
+      fieldnames = ["start", "end", "strand", "start_codon", "length"]
+    )
+  writer.writeheader()
+  writer.writerows(orfs)
+final_predictions_file.close()
