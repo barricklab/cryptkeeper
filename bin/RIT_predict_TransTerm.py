@@ -25,7 +25,7 @@ from Bio.SeqRecord import SeqRecord
 import subprocess
 import csv
 from operator import itemgetter
-import os.environment
+import os
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='input fasta')
