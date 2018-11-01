@@ -120,15 +120,40 @@ rit_predictions = []
 rit_reader = csv.DictReader(open(rit_prediction_file_name))
 for row in rit_reader:
   rit_predictions.append(row)
+
+orf_predictions = []
+orf_reader = csv.DictReader(open(orf_prediction_file_name))
+for row in orf_reader:
+  row['start_codon_position'] = int(row['start'] if row['strand'] == '+' else row['end'])
+  if row['strand'] == '+':
+    row['array_minus'] = 0
+    row['array'] = int(row['end']) - int(row['start']) + 1
+  else:
+    row['array_minus'] = int(row['end']) - int(row['start']) + 1  
+    row['array'] = 0
+  orf_predictions.append(row)
+
+#Re-sort by the start codon position so we are in the same order as RBS
+orf_predictions = sorted(orf_predictions, key=itemgetter('start_codon_position')) 
+
   
 rbs_predictions = []
 rbs_reader = csv.DictReader(open(rbs_prediction_file_name))
 for row in rbs_reader:
   row["score"] = numpy.log10(float(row["score"]))
   rbs_predictions.append(row)
-  
-  
+
+#transfer information from orfs before we filter
+for i in range(len(rbs_predictions)):
+  rbs_predictions[i]['array'] = orf_predictions[i]['array']
+  rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
+
+
 rbs_predictions = filter(lambda x:float(x["score"]) > 2, rbs_predictions)
+
+#Combine ORF and RBS predictions
+
+
 
 # Filter predictions
 
@@ -200,7 +225,14 @@ rbs_series = go.Scatter(
           arrayminus=[f['score'] for f in rbs_predictions],
           width=0,
           color=RBS_color,
-      )
+  ),
+  error_x=dict(
+          type='data',
+          array=[f['array'] for f in rbs_predictions],
+          arrayminus=[f['array_minus'] for f in rbs_predictions],
+          width=3,
+          color=RBS_color,
+  ),
 )
 
 layout = go.Layout(
