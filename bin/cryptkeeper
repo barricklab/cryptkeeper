@@ -109,6 +109,14 @@ if not options.plot_only:
     print(e)
 
 
+# Load sequence
+i=0
+for this_seq in SeqIO.parse(options.i, "fasta"):
+  i += 1
+  if (i>1):
+    exit()
+  main_seq = this_seq.upper()
+
 # Load predictions
 
 tss_predictions = []
@@ -136,7 +144,7 @@ for row in orf_reader:
 #Re-sort by the start codon position so we are in the same order as RBS
 orf_predictions = sorted(orf_predictions, key=itemgetter('start_codon_position')) 
 
-  
+#Combine ORF and RBS predictions
 rbs_predictions = []
 rbs_reader = csv.DictReader(open(rbs_prediction_file_name))
 for row in rbs_reader:
@@ -149,22 +157,27 @@ for i in range(len(rbs_predictions)):
   rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
 
 
-rbs_predictions = filter(lambda x:float(x["score"]) > 2, rbs_predictions)
-
-#Combine ORF and RBS predictions
-
-
-
 # Filter predictions
+rbs_predictions = filter(lambda x:float(x["score"]) > 1, rbs_predictions)
+
+
 
 # Display predictions
-
 
 #settings
 TSS_color = '#2ab717'
 RIT_color = '#ff0000'
 RBS_color = '#0d30e0'
 marker_size = 20
+tss_score_max = 10
+
+nucleotide_sequence  = go.Scatter(
+  x=range(1,len(main_seq)+1),
+  y=[tss_score_max]*len(main_seq),
+  mode='text',
+  name = 'Sequence',
+  text=list(main_seq.seq)
+)
 
 tss_series = go.Scatter(
   x = [d['TSSpos'] for d in tss_predictions],
@@ -243,7 +256,7 @@ layout = go.Layout(
   ),
   yaxis=dict(
     title='TSS score',
-    range = [0, 10],
+    range = [0, tss_score_max+0.2],
     titlefont=dict(
         color=TSS_color
     ),
@@ -253,7 +266,7 @@ layout = go.Layout(
   ),
   yaxis2=dict(
       title='RIT score',
-      range = [0, 105],
+      range = [0, 110],
       titlefont=dict(
           color=RIT_color
       ),
@@ -281,8 +294,7 @@ layout = go.Layout(
   ),
 )
 
-#data = [tss_series, rit_series, rbs_series]
-data = [tss_series, rit_series, rbs_series]
+data = [nucleotide_sequence, tss_series, rit_series, rbs_series]
 
 fig = dict( data=data, layout=layout )
 
