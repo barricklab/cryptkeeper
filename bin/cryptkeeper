@@ -18,6 +18,7 @@ from Bio.SeqRecord import SeqRecord
 import subprocess
 import csv
 from operator import itemgetter
+import os
 
 import plotly
 import plotly.graph_objs as go
@@ -70,6 +71,11 @@ if not options.plot_only:
   except OSError as e:
     print(e)
 
+# Create a gene annotation file
+gene_annotation_file_name = options.o + '.gene.csv'
+
+##=> to be implemented to read if input is genbank or GFF
+
 # Predict terminators
 rit_prediction_file_name = options.o + '.RIT.csv'
 
@@ -107,7 +113,6 @@ if not options.plot_only:
     print(e)
   except OSError as e:
     print(e)
-
 
 # Load sequence
 i=0
@@ -156,10 +161,19 @@ for i in range(len(rbs_predictions)):
   rbs_predictions[i]['array'] = orf_predictions[i]['array']
   rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
 
-
 # Filter predictions
-rbs_predictions = filter(lambda x:float(x["score"]) > 1, rbs_predictions)
+rbs_predictions = filter(lambda x:float(x["score"]) > 1.5, rbs_predictions)
 
+
+#reload the gene annotation files
+gene_annotations = []
+if os.path.isfile(gene_annotation_file_name):
+  gene_reader = csv.DictReader(open(gene_annotation_file_name))
+  for row in gene_reader:
+    row['position'] = row['end'] if row['strand'] == '+' else row['start']
+    row['array'] = 0 if row['strand'] == '+' else int(row['end']) - int(row['start'])
+    row['array_minus'] = int(row['end']) - int(row['start']) if row['strand'] == '+' else 0
+    gene_annotations.append(row)
 
 
 # Display predictions
@@ -168,23 +182,17 @@ rbs_predictions = filter(lambda x:float(x["score"]) > 1, rbs_predictions)
 TSS_color = '#2ab717'
 RIT_color = '#ff0000'
 RBS_color = '#0d30e0'
+gene_color = '#000000'
+gene_text_color = '#FFFFFF'
 marker_size = 20
 tss_score_max = 10
-
-nucleotide_sequence  = go.Scatter(
-  x=range(1,len(main_seq)+1),
-  y=[tss_score_max]*len(main_seq),
-  mode='text',
-  name = 'Sequence',
-  text=list(main_seq.seq)
-)
 
 tss_series = go.Scatter(
   x = [d['TSSpos'] for d in tss_predictions],
   y = [d['score'] for d in tss_predictions],
   mode = 'markers',
   name = 'TSS',
-
+  text = [ ('-35: ' + d['box35seq'] + "<br>" + '-10: ' + d['box10seq'])  for d in tss_predictions],
   
   marker = dict(
     symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in tss_predictions],
@@ -202,10 +210,11 @@ tss_series = go.Scatter(
 )
 
 rit_series = go.Scatter(
-  x = [e['start'] for e in rit_predictions],
+  x = [e['end'] for e in rit_predictions],
   y = [e['conf'] for e in rit_predictions],
   mode = 'markers',
   name = 'RIT',
+  text = [ ('hairpin score:' + d['hairpin_score'] + '; tail score:' + d['tail_score'] + '<br>' + d['seq_hairpin_open'] + '-' + d['seq_hairpin_loop'] + '-' + d['seq_hairpin_close'] + '-' + d['seq_tail'][0:7] )  for d in rit_predictions],
   yaxis='y2',
   marker = dict(
     symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in rit_predictions],
@@ -224,7 +233,8 @@ rit_series = go.Scatter(
 rbs_series = go.Scatter(
   x = [f['position'] for f in rbs_predictions],
   y = [f['score'] for f in rbs_predictions],
-  mode = 'markers',
+  mode = 'markers',  
+  text = [ ('start codon:' + d['start_codon'])  for d in rbs_predictions],
   name = 'RBS',
   yaxis='y3',
   marker = dict(
@@ -248,11 +258,43 @@ rbs_series = go.Scatter(
   ),
 )
 
+nucleotide_sequence  = go.Scatter(
+  x=range(1,len(main_seq)+1),
+  y=[0.97]*len(main_seq),
+  mode='text',
+  name = 'Sequence',
+  text=list(main_seq.seq),
+  yaxis='y4',
+)
+
+gene_series  = go.Scatter(
+  x=[f['position'] for f in gene_annotations],
+  y=[0.93]*len(gene_annotations),
+  mode='markers+text',
+  text=[ d['gene'] for d in gene_annotations ],
+  name = 'Gene',
+  yaxis='y4',
+  marker = dict(
+  symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left') for d in gene_annotations],
+    size=marker_size,
+    color=gene_color,
+    ),
+  error_x=dict(
+          type='data',
+          array=[f['array'] for f in gene_annotations],
+          arrayminus=[f['array_minus'] for f in gene_annotations],
+          thickness=10,
+          width=0,
+          color=gene_color,
+  ),
+)
+
 layout = go.Layout(
   title='cryptkeeper results: ' + input_fasta_file_name,
+  hovermode = 'closest',
   
   xaxis=dict(
-        domain=[0.18, 1.0]
+        domain=[0.20, 1.0]
   ),
   yaxis=dict(
     title='TSS score',
@@ -276,11 +318,11 @@ layout = go.Layout(
       anchor='free',
       overlaying='y',
       side='left',
-      position=0.06,
+      position=0.10,
   ),
   yaxis3=dict(
       title='log10 RBS score',
-      range = [2, 5],
+      range = [1, 5],
       titlefont=dict(
           color=RBS_color
       ),
@@ -290,11 +332,25 @@ layout = go.Layout(
       anchor='free',
       overlaying='y',
       side='left',
-      position=0.12,
+      position=0.15,
+  ),
+  yaxis4=dict(
+      title='sequence',
+      range = [0, 1],
+      titlefont=dict(
+          color='black'
+      ),
+      tickfont=dict(
+          color='black'
+      ),
+      anchor='free',
+      overlaying='y',
+      side='left',
+      position=0.05,
   ),
 )
 
-data = [nucleotide_sequence, tss_series, rit_series, rbs_series]
+data = [tss_series, rit_series, rbs_series, nucleotide_sequence, gene_series]
 
 fig = dict( data=data, layout=layout )
 
