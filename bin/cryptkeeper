@@ -28,8 +28,8 @@ import numpy
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='input fasta')
 parser.add_argument(
-    '-i',  
-    action='store', 
+    '-i',
+    action='store',
     dest='i',
     required=True,
     type=str,
@@ -37,14 +37,14 @@ parser.add_argument(
     )
 
 parser.add_argument(
-    '-o',  
-    action='store', 
+    '-o',
+    action='store',
     dest='o',
     required=True,
     type=str,
     help="output file prefix",
     )
-    
+
 parser.add_argument(
     '-p',
     action='store_true',
@@ -125,41 +125,61 @@ for this_seq in SeqIO.parse(options.i, "fasta"):
 # Load predictions
 
 tss_predictions = []
-tss_reader = csv.DictReader(open(tss_prediction_file_name))
-for row in tss_reader:
-  tss_predictions.append(row)
-  
+if (os.path.isfile(tss_prediction_file_name)):
+  tss_reader = csv.DictReader(open(tss_prediction_file_name))
+  for row in tss_reader:
+    tss_predictions.append(row)
+
 rit_predictions = []
-rit_reader = csv.DictReader(open(rit_prediction_file_name))
-for row in rit_reader:
-  rit_predictions.append(row)
+if (os.path.isfile(rit_prediction_file_name)):
+  rit_reader = csv.DictReader(open(rit_prediction_file_name))
+  for row in rit_reader:
+    rit_predictions.append(row)
 
 orf_predictions = []
-orf_reader = csv.DictReader(open(orf_prediction_file_name))
-for row in orf_reader:
-  row['start_codon_position'] = int(row['start'] if row['strand'] == '+' else row['end'])
-  if row['strand'] == '+':
-    row['array_minus'] = 0
-    row['array'] = int(row['end']) - int(row['start']) + 1
-  else:
-    row['array_minus'] = int(row['end']) - int(row['start']) + 1  
-    row['array'] = 0
-  orf_predictions.append(row)
+if (os.path.isfile(orf_prediction_file_name)):
+  orf_reader = csv.DictReader(open(orf_prediction_file_name))
+  for row in orf_reader:
+    row['start_codon_position'] = int(row['start'] if row['strand'] == '+' else row['end'])
+    if row['strand'] == '+':
+      row['array_minus'] = 0
+      row['array'] = int(row['end']) - int(row['start']) + 1
+    else:
+      row['array_minus'] = int(row['end']) - int(row['start']) + 1
+      row['array'] = 0
+    orf_predictions.append(row)
 
 #Re-sort by the start codon position so we are in the same order as RBS
-orf_predictions = sorted(orf_predictions, key=itemgetter('start_codon_position')) 
+orf_predictions = sorted(orf_predictions, key=itemgetter('start_codon_position'))
 
-#Combine ORF and RBS predictions
+#Combine ORF and RBS predictions AND calculate the crypt score
 rbs_predictions = []
 rbs_reader = csv.DictReader(open(rbs_prediction_file_name))
 for row in rbs_reader:
   row["score"] = numpy.log10(float(row["score"]))
   rbs_predictions.append(row)
 
+
+total_burden = 0
+
+summary_file_name = options.o + '.summary.txt'
+summary_file = open(summary_file_name, 'w')
+
 #transfer information from orfs before we filter
 for i in range(len(rbs_predictions)):
   rbs_predictions[i]['array'] = orf_predictions[i]['array']
   rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
+
+  orf_length = (int(orf_predictions[i]['end']) - int(orf_predictions[i]['start']) + 1)
+  rbs_score = 10**float(rbs_predictions[i]['score'])
+  rbs_predictions[i]['burden'] = orf_length * rbs_score
+
+  total_burden = total_burden + rbs_predictions[i]['burden']
+  summary_file.write("  " + str(orf_predictions[i]['start_codon_position']) + " Burden: " + str(rbs_predictions[i]['burden']) + "[ RBS Score: " + str(rbs_score) + " + ORF Length: " + str(orf_length) + " ]\n")
+
+
+summary_file.write("Total Burden: " + str(total_burden) + "\n")
+
 
 # Filter predictions
 rbs_predictions = filter(lambda x:float(x["score"]) > 1.5, rbs_predictions)
@@ -193,13 +213,13 @@ tss_series = go.Scatter(
   mode = 'markers',
   name = 'TSS',
   text = [ ('-35: ' + d['box35seq'] + "<br>" + '-10: ' + d['box10seq'])  for d in tss_predictions],
-  
+
   marker = dict(
     symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in tss_predictions],
     size=marker_size,
     color=TSS_color,
   ),
-  
+
   error_y=dict(
             type='data',
             array=[0],
@@ -233,7 +253,7 @@ rit_series = go.Scatter(
 rbs_series = go.Scatter(
   x = [f['position'] for f in rbs_predictions],
   y = [f['score'] for f in rbs_predictions],
-  mode = 'markers',  
+  mode = 'markers',
   text = [ ('start codon:' + d['start_codon'])  for d in rbs_predictions],
   name = 'RBS',
   yaxis='y3',
@@ -290,9 +310,9 @@ gene_series  = go.Scatter(
 )
 
 layout = go.Layout(
-  title='cryptkeeper results: ' + input_fasta_file_name,
+  title='CryptKeeper Results: ' + input_fasta_file_name + "  Burden: " + str(total_burden),
   hovermode = 'closest',
-  
+
   xaxis=dict(
         domain=[0.20, 1.0]
   ),

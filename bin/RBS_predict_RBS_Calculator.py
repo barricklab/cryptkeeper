@@ -67,8 +67,8 @@ options = parser.parse_args()
 
 
 script_path = os.path.dirname(os.path.realpath(__file__))
-#start_codons = ['ATG', 'GTG', 'TTG']
-start_codons = ['ATG', 'GTG']
+start_codons = ['ATG', 'GTG', 'TTG']
+#start_codons = ['ATG', 'GTG']
 
 
 i=0
