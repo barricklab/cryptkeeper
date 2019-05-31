@@ -183,24 +183,45 @@ def process_RBS_calculator_output_file(input_file_name, is_reverse_complement, s
   with open(input_file_name) as f:
     lines = f.readlines()
 
-  for line in lines:
-    line = line.strip()
-    if (line == ""):
-      continue
-    split_line = line.split()
-    if len(split_line) != 3:
-      continue
+  failed_prediction = False
+  line_index = 0
+  while line_index < len(lines):
+    line = lines[line_index].strip()
 
-    new_entry = {}
+    # First line of pair
+    #   1 or 'Warning: There is a leaderless start codon, which is being ignored.'
+    if line_index % 2 == 0:
 
-    # RBS calculator returns 0-indexed positions
-    pos_1 = int(split_line[0]) + 1
-    new_entry["position"] =  pos_1 if not is_reverse_complement else sequence_length - pos_1 + 1;
-    new_entry["start_codon"] =  forward_seq[pos_1-1:pos_1+2] if not is_reverse_complement else reverse_seq[pos_1-1:pos_1+2];
-    new_entry["strand"] = '-' if is_reverse_complement else '+'
-    new_entry["score"] = split_line[1]
-    new_entry["score2"] = split_line[2]
-    entry_list.append(new_entry)
+      failed_prediction = False
+      #append em
+      if line == "'Warning: There is a leaderless start codon, which is being ignored.'":
+        failed_prediction = True
+
+    # Second line of pair
+    #  pos_1, score, score2
+    else:
+
+      split_line = []
+      if not failed_prediction:
+        split_line = line.split()
+        if len(split_line) != 3:
+          print("Unexpected number of items in line: " + line)
+          continue
+      else: #failed prediction: put in dummy score entry so we still sync with ORF predictions
+        split_line = [0, 0.00000001, 0]
+
+      new_entry = {}
+
+      # RBS calculator returns 0-indexed positions
+      pos_1 = int(split_line[0]) + 1
+      new_entry["position"] =  pos_1 if not is_reverse_complement else sequence_length - pos_1 + 1;
+      new_entry["start_codon"] =  forward_seq[pos_1-1:pos_1+2] if not is_reverse_complement else reverse_seq[pos_1-1:pos_1+2];
+      new_entry["strand"] = '-' if is_reverse_complement else '+'
+      new_entry["score"] = split_line[1]
+      new_entry["score2"] = split_line[2]
+      entry_list.append(new_entry)
+
+    line_index = line_index+1
 
   return(entry_list)
 

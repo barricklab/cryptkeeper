@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# -*- coding: latin-1 -*-
+
+
 
 """
 
@@ -167,6 +170,7 @@ summary_file = open(summary_file_name, 'w')
 
 #transfer information from orfs before we filter
 for i in range(len(rbs_predictions)):
+
   rbs_predictions[i]['array'] = orf_predictions[i]['array']
   rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
 
@@ -177,8 +181,7 @@ for i in range(len(rbs_predictions)):
   total_burden = total_burden + rbs_predictions[i]['burden']
   summary_file.write("  " + str(orf_predictions[i]['start_codon_position']) + " Burden: " + str(rbs_predictions[i]['burden']) + "[ RBS Score: " + str(rbs_score) + " + ORF Length: " + str(orf_length) + " ]\n")
 
-
-summary_file.write("Total Burden: " + str(total_burden) + "\n")
+summary_file.write("Total Burden: " + str(total_burden))
 
 
 # Filter predictions
@@ -254,7 +257,7 @@ rbs_series = go.Scatter(
   x = [f['position'] for f in rbs_predictions],
   y = [f['score'] for f in rbs_predictions],
   mode = 'markers',
-  text = [ ('start codon:' + d['start_codon'])  for d in rbs_predictions],
+  text = [ ('start codon:' + d['start_codon'] + "<br>Burden ×10<sup>6</sup>: " + "{0:.6f}".format(d['burden']/1000000) + " (" + "{0:.2f}".format(100*d['burden']/total_burden) + "%}")  for d in rbs_predictions],
   name = 'RBS',
   yaxis='y3',
   marker = dict(
@@ -310,7 +313,7 @@ gene_series  = go.Scatter(
 )
 
 layout = go.Layout(
-  title='CryptKeeper Results: ' + input_fasta_file_name + "  Burden: " + str(total_burden),
+  title='CryptKeeper Results: ' + input_fasta_file_name + "  Burden ×10<sup>6</sup>: " + "{0:.2f}".format(total_burden/1000000),
   hovermode = 'closest',
 
   xaxis=dict(
