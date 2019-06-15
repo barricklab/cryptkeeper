@@ -55,6 +55,20 @@ parser.add_argument(
     help="plot mode, assumes output files all exist",
     )
 
+parser.add_argument(
+    '-n',
+    action='store',
+    dest='name',
+    help="name of sample(if not present filename is used)",
+    )
+
+parser.add_argument(
+    '-w',
+    action='store_true',
+    dest='web',
+    help="Web mode. Writes output as a div without including javascript to file *.div instead of normal *.html",
+    )
+
 #------------------------------------------------------------------------------
 
 options = parser.parse_args()
@@ -312,9 +326,17 @@ gene_series  = go.Scatter(
   ),
 )
 
+
+## Use display name at command line if it was given, otherwise file name
+if options.name:
+  display_name = options.name
+else:
+  display_name = input_fasta_file_name
+
 layout = go.Layout(
-  title='CryptKeeper Results: ' + input_fasta_file_name + "  Burden ×10<sup>6</sup>: " + "{0:.2f}".format(total_burden/1000000),
+  title='CryptKeeper Results: ' + display_name + "  Burden ×10<sup>6</sup>: " + "{0:.2f}".format(total_burden/1000000),
   hovermode = 'closest',
+  autosize=True,
 
   xaxis=dict(
         domain=[0.20, 1.0]
@@ -377,4 +399,10 @@ data = [tss_series, rit_series, rbs_series, nucleotide_sequence, gene_series]
 
 fig = dict( data=data, layout=layout )
 
-plotly.offline.plot(fig, filename= options.o + '.plot.html')
+if (options.web):
+  dev_content = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+  f = open(options.o+'.plot.div', 'w')
+  f.write(dev_content)
+  f.close()
+else:
+  plotly.offline.plot(fig, filename=options.o+'.plot.html')

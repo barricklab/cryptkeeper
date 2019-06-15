@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <title>CryptKeeper {{ results_name }}</title>
+    {% load staticfiles %}
+    <link href="{% static 'cryptkeeper/styles.css' %}" rel="stylesheet" type="text/css" media="all" />
+    {% if results_div %}
+      <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    {% endif %}
+  </head>
+  <body>
+    <div id="wrapper">
+    <h1 id="logo"></h1>
+    <h1 id="banner"></h1>
+      <div id="csv-button">
+        <div><a href="https://github.com/barricklab/cryptkeeper/wiki" target="_blank">Help</a></div>
+      </div>
+      {% if results_div %}
+        {{results_div|safe}}
+      {% else %}
+        <p>Results still running for results_name ({{ results_uid }})
+        <p>This could take a few minutes. Reload this page to check for completion.
+      {% endif %}
+    </div>
+    <div class="footer">
+    </div>
+  </body>
+</html>
