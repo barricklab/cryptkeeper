@@ -133,6 +133,7 @@ if not options.plot_only:
 
 # Load sequence
 i=0
+main_seq = None
 for this_seq in SeqIO.parse(options.i, "fasta"):
   i += 1
   if (i>1):
@@ -198,8 +199,9 @@ for i in range(len(rbs_predictions)):
 summary_file.write("Total Burden: " + str(total_burden))
 
 
+
 # Filter predictions
-rbs_predictions = filter(lambda x:float(x["score"]) > 1.5, rbs_predictions)
+rbs_predictions = list(filter(lambda x:float(x["score"]) > 1, rbs_predictions))
 
 
 #reload the gene annotation files
@@ -296,7 +298,7 @@ rbs_series = go.Scatter(
 )
 
 nucleotide_sequence  = go.Scatter(
-  x=range(1,len(main_seq)+1),
+  x=list(range(0,len(main_seq)-1)),
   y=[0.97]*len(main_seq),
   mode='text',
   name = 'Sequence',
