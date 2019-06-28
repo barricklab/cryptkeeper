@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# -*- coding: latin-1 -*-
+
+
 
 """
 
@@ -50,6 +53,20 @@ parser.add_argument(
     action='store_true',
     dest='plot_only',
     help="plot mode, assumes output files all exist",
+    )
+
+parser.add_argument(
+    '-n',
+    action='store',
+    dest='name',
+    help="name of sample(if not present filename is used)",
+    )
+
+parser.add_argument(
+    '-w',
+    action='store_true',
+    dest='web',
+    help="Web mode. Writes output as a div without including javascript to file *.div instead of normal *.html",
     )
 
 #------------------------------------------------------------------------------
@@ -116,6 +133,7 @@ if not options.plot_only:
 
 # Load sequence
 i=0
+main_seq = None
 for this_seq in SeqIO.parse(options.i, "fasta"):
   i += 1
   if (i>1):
@@ -167,6 +185,7 @@ summary_file = open(summary_file_name, 'w')
 
 #transfer information from orfs before we filter
 for i in range(len(rbs_predictions)):
+
   rbs_predictions[i]['array'] = orf_predictions[i]['array']
   rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
 
@@ -177,12 +196,12 @@ for i in range(len(rbs_predictions)):
   total_burden = total_burden + rbs_predictions[i]['burden']
   summary_file.write("  " + str(orf_predictions[i]['start_codon_position']) + " Burden: " + str(rbs_predictions[i]['burden']) + "[ RBS Score: " + str(rbs_score) + " + ORF Length: " + str(orf_length) + " ]\n")
 
+summary_file.write("Total Burden: " + str(total_burden))
 
-summary_file.write("Total Burden: " + str(total_burden) + "\n")
 
 
 # Filter predictions
-rbs_predictions = filter(lambda x:float(x["score"]) > 1.5, rbs_predictions)
+rbs_predictions = list(filter(lambda x:float(x["score"]) > 1, rbs_predictions))
 
 
 #reload the gene annotation files
@@ -254,7 +273,7 @@ rbs_series = go.Scatter(
   x = [f['position'] for f in rbs_predictions],
   y = [f['score'] for f in rbs_predictions],
   mode = 'markers',
-  text = [ ('start codon:' + d['start_codon'])  for d in rbs_predictions],
+  text = [ ('start codon:' + d['start_codon'] + "<br>Burden ×10<sup>6</sup>: " + "{0:.6f}".format(d['burden']/1000000) + " (" + "{0:.2f}".format(100*d['burden']/total_burden) + "%}")  for d in rbs_predictions],
   name = 'RBS',
   yaxis='y3',
   marker = dict(
@@ -279,7 +298,7 @@ rbs_series = go.Scatter(
 )
 
 nucleotide_sequence  = go.Scatter(
-  x=range(1,len(main_seq)+1),
+  x=list(range(0,len(main_seq)-1)),
   y=[0.97]*len(main_seq),
   mode='text',
   name = 'Sequence',
@@ -309,9 +328,17 @@ gene_series  = go.Scatter(
   ),
 )
 
+
+## Use display name at command line if it was given, otherwise file name
+if options.name:
+  display_name = options.name
+else:
+  display_name = input_fasta_file_name
+
 layout = go.Layout(
-  title='CryptKeeper Results: ' + input_fasta_file_name + "  Burden: " + str(total_burden),
+  title='CryptKeeper Results: ' + display_name + "  Burden ×10<sup>6</sup>: " + "{0:.2f}".format(total_burden/1000000),
   hovermode = 'closest',
+  autosize=True,
 
   xaxis=dict(
         domain=[0.20, 1.0]
@@ -374,4 +401,10 @@ data = [tss_series, rit_series, rbs_series, nucleotide_sequence, gene_series]
 
 fig = dict( data=data, layout=layout )
 
-plotly.offline.plot(fig, filename= options.o + '.plot.html')
+if (options.web):
+  dev_content = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+  f = open(options.o+'.plot.div', 'w')
+  f.write(dev_content)
+  f.close()
+else:
+  plotly.offline.plot(fig, filename=options.o+'.plot.html')
