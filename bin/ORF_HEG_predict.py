@@ -14,7 +14,6 @@ import Bio.Data.CodonTable
 from operator import itemgetter
 import csv
 from CAI import CAI, relative_adaptiveness
-import subprocess
 
 
 #------------------------------------------------------------------------------
