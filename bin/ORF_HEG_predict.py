@@ -14,7 +14,8 @@ import Bio.Data.CodonTable
 from operator import itemgetter
 import csv
 from CAI import CAI, relative_adaptiveness
-
+import os
+import re
 
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='import fasta for ORF detection')
@@ -28,7 +29,7 @@ parser.add_argument('-i',
 parser.add_argument('-j',
     action = 'store',
     dest = 'j',
-    required = True,
+    default = re.sub("bin/ORF_HEG_predict.py$","data/E_coli_HEG.fasta",os.path.realpath(__file__)),
     type = str,
     help = "input using '-j' file for CAI calculations (full sequence)")
 
@@ -58,6 +59,7 @@ parser.add_argument('-o',
 options = parser.parse_args()
 translation_table_id = options.t #NCBI translation table for Bacterial, Archaeal, and Plant Plastids
 minimum_orf_aa_length = options.l 
+full_seq = options.j
 full_seq = options.j
 
 #subset fasta file into strings to input into CAI
