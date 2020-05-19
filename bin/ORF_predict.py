@@ -14,6 +14,7 @@ from Bio import SeqIO
 import Bio.Data.CodonTable
 from operator import itemgetter
 import csv
+from math import floor
 
 
 #------------------------------------------------------------------------------
@@ -87,7 +88,11 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
       start_pos_1 = start_pos_0+1
 
       #print(this_seq[start_pos_0:])
-      aa_sequence = this_seq[start_pos_0:].seq.translate(translation_table, to_stop=True)
+
+      #remove bases to make a multiple of three to avoid BioPython warnings
+      end_pos_1 = start_pos_0+floor(float(len(this_seq)-start_pos_0)/3.0)*3
+
+      aa_sequence = this_seq[start_pos_0:end_pos_1].seq.translate(translation_table, to_stop=True)
       #print(aa_sequence)
       aa_length = len(aa_sequence)
 
