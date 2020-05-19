@@ -22,6 +22,8 @@ import subprocess
 import csv
 from operator import itemgetter
 import os
+import sys
+from copy import deepcopy
 
 import plotly
 import plotly.graph_objs as go
@@ -31,7 +33,7 @@ import numpy
 #------------------------------------------------------------------------------
 parser = argparse.ArgumentParser(description='input fasta')
 parser.add_argument(
-    '-i',
+    '-i', '--input',
     action='store',
     dest='i',
     required=True,
@@ -40,7 +42,14 @@ parser.add_argument(
     )
 
 parser.add_argument(
-    '-o',
+    '-c', '--circular',
+    action='store_true',
+    dest='circular',
+    help="The input file is circular. (Note: Increases runtime by 3x)",
+    )
+
+parser.add_argument(
+    '-o', '--output',
     action='store',
     dest='o',
     required=True,
@@ -49,31 +58,65 @@ parser.add_argument(
     )
 
 parser.add_argument(
-    '-p',
+    '-p', '--plot-only',
     action='store_true',
     dest='plot_only',
     help="plot mode, assumes output files all exist",
     )
 
 parser.add_argument(
-    '-n',
+    '-n', '--name',
     action='store',
     dest='name',
-    help="name of sample(if not present filename is used)",
+    help="name of sample (if not provided the filename is used)",
     )
 
 parser.add_argument(
-    '-w',
+    '--rbs-score-cutoff',
+    action='store',
+    dest='rbs_score_cutoff',
+    default=2.0,
+    type=float,
+    help="Minimum score that is graphed and output to final files (all are used in calculating burden)",
+    )
+
+parser.add_argument(
+    '-w', '--web',
     action='store_true',
     dest='web',
-    help="Web mode. Writes output as a div without including javascript to file *.div instead of normal *.html",
+    help="web mode. Writes output as a div without including javascript to file *.div instead of normal *.html",
     )
+
+#parser.add_argument(
+#    '--pdf',
+#    action='store_true',
+#    dest='pdf',
+#    help="write output plot as *.pdf",
+#    )
 
 #------------------------------------------------------------------------------
 
 options = parser.parse_args()
 
 input_fasta_file_name = options.i
+
+output_circular_fasta_file_name = options.o + '.circular.3x.fasta'
+
+###### CIRCULAR SEQUENCE ######
+# create a 3x version of the FASTA input file
+i = 0
+for this_seq in SeqIO.parse(options.i, "fasta"):
+  i += 1
+  if (i>1):
+    print("FASTA contains multiple sequences. Only the first will be processed.")
+    break
+  sequence_length = len(this_seq)
+  if (options.circular):
+    with open(output_circular_fasta_file_name, "w") as output_handle:
+      this_seq.seq = this_seq.seq + this_seq.seq + this_seq.seq
+      SeqIO.write([this_seq], output_handle, "fasta")
+      input_fasta_file_name = output_circular_fasta_file_name
+
 
 # Predict promoters
 tss_prediction_file_name = options.o + '.TSS.csv'
@@ -189,19 +232,34 @@ for i in range(len(rbs_predictions)):
   rbs_predictions[i]['array'] = orf_predictions[i]['array']
   rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
 
-  orf_length = (int(orf_predictions[i]['end']) - int(orf_predictions[i]['start']) + 1)
+  orf_start = int(orf_predictions[i]['start'])
+  orf_end = int(orf_predictions[i]['end'])
+  orf_length = orf_end - orf_start + 1
   rbs_score = 10**float(rbs_predictions[i]['score'])
   rbs_predictions[i]['burden'] = orf_length * rbs_score
 
-  total_burden = total_burden + rbs_predictions[i]['burden']
-  summary_file.write("  " + str(orf_predictions[i]['start_codon_position']) + " Burden: " + str(rbs_predictions[i]['burden']) + "[ RBS Score: " + str(rbs_score) + " + ORF Length: " + str(orf_length) + " ]\n")
+  # Add information to the orf as well
+  orf_predictions[i]['rbs_score'] = rbs_predictions[i]['score']
+  orf_predictions[i]['second_half'] = 'F'
+
+  ###### CIRCULAR SEQUENCE ######
+  # We need to only add if we are in the second copy,
+  # between sequence_length + 1 and 2 * sequence_length
+
+  add_to_score = True
+  if (options.circular):
+    if (orf_start <= sequence_length) or (orf_start >= sequence_length * 2 + 1):
+      add_to_score = False
+
+  if (add_to_score):
+    total_burden = total_burden + rbs_predictions[i]['burden']
+    summary_file.write("  " + str(orf_predictions[i]['start_codon_position']) + " Burden: " + str(rbs_predictions[i]['burden']) + "[ RBS Score: " + str(rbs_score) + " + ORF Length: " + str(orf_length) + " ]\n")
 
 summary_file.write("Total Burden: " + str(total_burden))
 
 
-
-# Filter predictions
-rbs_predictions = list(filter(lambda x:float(x["score"]) > 1, rbs_predictions))
+# Filter predictions that we show
+rbs_predictions = list(filter(lambda x:float(x["score"]) > options.rbs_score_cutoff, rbs_predictions))
 
 
 #reload the gene annotation files
@@ -215,6 +273,71 @@ if os.path.isfile(gene_annotation_file_name):
     gene_annotations.append(row)
 
 
+
+
+###### CIRCULAR SEQUENCE ######
+
+if options.circular:
+
+  # Remove ones with out of bounds starts/ends/positions (whichever is graphed)
+  orf_predictions = list(filter(lambda x:(int(x['start']) >= sequence_length + 1)  and (int(x['start']) <= sequence_length * 2), orf_predictions))
+  rbs_predictions = list(filter(lambda x:(int(x['position']) >= sequence_length + 1)  and (int(x['position']) <= sequence_length * 2), rbs_predictions))
+  tss_predictions = list(filter(lambda x:(int(x['TSSpos']) >= sequence_length + 1)  and (int(x['TSSpos']) <= sequence_length * 2), tss_predictions))
+  rit_predictions = list(filter(lambda x:(int(x['end']) >= sequence_length + 1)  and (int(x['end']) <= sequence_length * 2), rit_predictions))
+
+  # Correct coordinates of remaining
+
+  for d in rbs_predictions:
+    d['position'] = str(int(d['position']) - sequence_length)
+
+  for d in tss_predictions:
+    d['TSSpos'] = str(int(d['TSSpos']) - sequence_length)
+
+  for d in rit_predictions:
+    d['end'] = str(int(d['end']) - sequence_length)
+
+  # Split reading frames and assign
+  added_split_orfs = []
+  for d in orf_predictions:
+    d['start'] = str(int(d['start']) - sequence_length)
+    d['end'] = str(int(d['end']) - sequence_length)
+
+    if (int(d['end']) > sequence_length):
+
+      new_split_orf = deepcopy(d)
+      d['end'] = str(sequence_length)
+      new_split_orf['start'] = "1"
+      new_split_orf['end'] = str(int(new_split_orf['end']) - sequence_length)
+
+      if (d['strand'] != '+'):
+        d['second_half'] = 'T'
+      else:
+        new_split_orf['second_half'] = 'T'
+
+      added_split_orfs.append(new_split_orf)
+  orf_predictions.extend(added_split_orfs)
+
+# Print out entire changed lists - for graphing outside of this program in R, etc.
+with open(options.o + ".final.ORF.csv",'w') as final_orf_predictions_file:
+  writer = csv.DictWriter(
+      final_orf_predictions_file,
+      fieldnames = ["start", "end", "strand", "start_codon", 'length', 'rbs_score', 'array', 'array_minus', 'start_codon_position', 'second_half']
+    )
+  writer.writeheader()
+  writer.writerows(orf_predictions)
+final_orf_predictions_file.close()
+
+with open(options.o + ".final.RBS.csv",'w') as final_rbs_predictions_file:
+  writer = csv.DictWriter(
+      final_rbs_predictions_file,
+      fieldnames = ["position", "strand", "start_codon", "score", "score2", "burden", "array", "array_minus"]
+    )
+  writer.writeheader()
+  writer.writerows(rbs_predictions)
+final_rbs_predictions_file.close()
+
+
+
 # Display predictions
 
 #settings
@@ -224,7 +347,7 @@ RBS_color = '#0d30e0'
 gene_color = '#000000'
 gene_text_color = '#FFFFFF'
 marker_size = 20
-tss_score_max = 10
+tss_score_max = 25
 
 tss_series = go.Scatter(
   x = [d['TSSpos'] for d in tss_predictions],
@@ -369,7 +492,7 @@ layout = go.Layout(
   ),
   yaxis3=dict(
       title='log10 RBS score',
-      range = [1, 5],
+      range = [2, 6],
       titlefont=dict(
           color=RBS_color
       ),
@@ -401,6 +524,8 @@ data = [tss_series, rit_series, rbs_series, nucleotide_sequence, gene_series]
 
 fig = dict( data=data, layout=layout )
 
+#if (options.pdf):
+#  fig.write_image(options.o+'.pdf')
 if (options.web):
   dev_content = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
   f = open(options.o+'.plot.div', 'w')
