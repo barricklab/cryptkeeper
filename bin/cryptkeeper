@@ -240,7 +240,7 @@ for i in range(len(rbs_predictions)):
 
   # Add information to the orf as well
   orf_predictions[i]['rbs_score'] = rbs_predictions[i]['score']
-  orf_predictions[i]['second_half'] = 'F'
+  orf_predictions[i]['second_half'] = 'T'
 
   ###### CIRCULAR SEQUENCE ######
   # We need to only add if we are in the second copy,
