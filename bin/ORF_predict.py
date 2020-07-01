@@ -16,52 +16,6 @@ from operator import itemgetter
 import csv
 from math import floor
 
-
-#------------------------------------------------------------------------------
-parser = argparse.ArgumentParser(description='import fasta for ORF detection')
-parser.add_argument('-i',
-    action='store',
-    dest='i',
-    required=True,
-    type=str,
-    help="input .fasta file for ORF search")
-
-parser.add_argument('-t',
-    action='store',
-    dest='t',
-    required=False,
-    default=11,
-    type=str,
-    help="set NCBI translation table, default = 11: Bacterial, Archaeal, and Plant Plastids")
-
-parser.add_argument('-l',
-    action='store',
-    dest='l',
-    required=False,
-    default=30,
-    type=str,
-    help="set minimum length of protein (in amino acids)")
-
-parser.add_argument('-o',
-    action='store',
-    dest= 'o',
-    required=True,
-    type=str,
-    help="outfile prefix")
-#------------------------------------------------------------------------------
-options = parser.parse_args()
-translation_table_id = options.t #NCBI translation table for Bacterial, Archaeal, and Plant Plastids
-minimum_orf_aa_length = options.l
-
-i=0
-main_seq = None
-for this_seq in SeqIO.parse(options.i, "fasta"):
-  i += 1
-  if (i>1):
-    exit()
-  main_seq = this_seq.upper()
-
-
 def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
   orfs = []
   seq_len = len(seq)
@@ -120,14 +74,76 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
   orfs = sorted(orfs, key=itemgetter('start'))
   return orfs
 
-orfs = find_orfs(main_seq, translation_table_id, minimum_orf_aa_length)
 
-#write each tuple of list to outfile
-with open(options.o,'w') as final_predictions_file:
-  writer = csv.DictWriter(
-      final_predictions_file,
-      fieldnames = ["start", "end", "strand", "start_codon", "length"]
-    )
-  writer.writeheader()
-  writer.writerows(orfs)
-final_predictions_file.close()
+def main(options):
+    translation_table_id = options.t #NCBI translation table for Bacterial, Archaeal, and Plant Plastids
+    minimum_orf_aa_length = options.l
+
+    i=0
+    main_seq = None
+    for this_seq in SeqIO.parse(options.i, "fasta"):
+      i += 1
+      if (i>1):
+        exit()
+      main_seq = this_seq.upper()
+
+
+    orfs = find_orfs(main_seq, translation_table_id, minimum_orf_aa_length)
+
+    #write each tuple of list to outfile
+    with open(options.o,'w') as final_predictions_file:
+      writer = csv.DictWriter(
+          final_predictions_file,
+          fieldnames = ["start", "end", "strand", "start_codon", "length"]
+        )
+      writer.writeheader()
+      writer.writerows(orfs)
+    final_predictions_file.close()
+
+def ORF_predict(input, output, transtable=11, minlength=0):
+    # Pretend to be an argument parser
+    class ObjectClass:
+        pass
+    options = ObjectClass
+    options.i = input
+    options.o = output
+    options.t = transtable
+    options.l = minlength
+    main(options)
+
+if __name__ == "__main__":
+    # ------------------------------------------------------------------------------
+    parser = argparse.ArgumentParser(description='import fasta for ORF detection')
+    parser.add_argument('-i',
+                        action='store',
+                        dest='i',
+                        required=True,
+                        type=str,
+                        help="input .fasta file for ORF search")
+
+    parser.add_argument('-t',
+                        action='store',
+                        dest='t',
+                        required=False,
+                        default=11,
+                        type=str,
+                        help="set NCBI translation table, default = 11: Bacterial, Archaeal, and Plant Plastids")
+
+    parser.add_argument('-l',
+                        action='store',
+                        dest='l',
+                        required=False,
+                        default=30,
+                        type=str,
+                        help="set minimum length of protein (in amino acids)")
+
+    parser.add_argument('-o',
+                        action='store',
+                        dest='o',
+                        required=True,
+                        type=str,
+                        help="outfile prefix")
+    # ------------------------------------------------------------------------------
+    options = parser.parse_args()
+
+    main(options)
