@@ -145,8 +145,9 @@ def main(options):
 
     if not options.plot_only:
         logger.normal("Running RBS prediction")
-        from RBS_predict_RBS_Calculator import RBS_predict_RBS_Calculator
-        RBS_predict_RBS_Calculator(input_file_name, rbs_prediction_file_name, starts=orf_prediction_file_name)
+        from Run_RBS_Vienna import RBS_predict_RBS_Calculator
+        #RBS_predict_RBS_Calculator(input_file_name, rbs_prediction_file_name, starts=orf_prediction_file_name)
+        RBS_predict_RBS_Calculator(input_file_name, rbs_prediction_file_name)  # This is faster for some reason
         '''
         rbs_command = ('python3 RBS_predict_RBS_Calculator.py -i ' + input_file_name + ' -o ' +
                        rbs_prediction_file_name + ' -s ' + orf_prediction_file_name)

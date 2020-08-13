@@ -102,3 +102,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+bin/RBS_Calculator_Vienna.py
+bin/rna_turner1999.par
+bin/ViennaRNA.py
