@@ -9,17 +9,10 @@ Predict cryptic bacterial gene expression signals in an input sequence.
 """
 
 import argparse
-import Bio
-from Bio.SeqIO import FastaIO
-from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
 from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
-import subprocess
 import csv
 from operator import itemgetter
 import os
-import sys
 from copy import deepcopy
 
 import plotly
@@ -145,20 +138,9 @@ def main(options):
 
     if not options.plot_only:
         logger.normal("Running RBS prediction")
-        from Run_RBS_Vienna import RBS_predict_RBS_Calculator
-        #RBS_predict_RBS_Calculator(input_file_name, rbs_prediction_file_name, starts=orf_prediction_file_name)
-        RBS_predict_RBS_Calculator(input_file_name, rbs_prediction_file_name)  # This is faster for some reason
-        '''
-        rbs_command = ('python3 RBS_predict_RBS_Calculator.py -i ' + input_file_name + ' -o ' +
-                       rbs_prediction_file_name + ' -s ' + orf_prediction_file_name)
-        logger.normal(rbs_command)
-        try:
-            subprocess.check_call(rbs_command, shell=True)
-        except subprocess.CalledProcessError as e:
-            logger.normal(e)
-        except OSError as e:
-            logger.normal(e)
-        '''
+        from RBS_calc_via_OSTIR import RBS_predict_RBS_Calculator
+        RBS_predict_RBS_Calculator(input_file_name, rbs_prediction_file_name, starts=orf_prediction_file_name)
+
 
     # Load sequence
     i = 0
@@ -187,12 +169,6 @@ def main(options):
         orf_reader = csv.DictReader(open(orf_prediction_file_name))
         for row in orf_reader:
             row['start_codon_position'] = int(row['start'] if row['strand'] == '+' else row['end'])
-            if row['strand'] == '+':
-                row['array_minus'] = 0
-                row['array'] = int(row['end']) - int(row['start']) + 1
-            else:
-                row['array_minus'] = int(row['end']) - int(row['start']) + 1
-                row['array'] = 0
             orf_predictions.append(row)
 
     # Re-sort by the start codon position so we are in the same order as RBS
@@ -200,6 +176,8 @@ def main(options):
     # Combine ORF and RBS predictions AND calculate the crypt score
     rbs_predictions = []
     rbs_reader = csv.DictReader(open(rbs_prediction_file_name))
+
+    # Find ORFs with predicted RBS and append their scores. @croots: Bad things happen if you throw the whole seq at OSTIR
     for row in rbs_reader:
         row["score"] = numpy.log10(float(row["score"]))
         rbs_predictions.append(row)
@@ -209,41 +187,84 @@ def main(options):
     summary_file_name = options.o + '.summary.txt'
     summary_file = open(summary_file_name, 'w')
 
-    # transfer information from orfs before we filter
-    for i in range(len(rbs_predictions)):
 
-        rbs_predictions[i]['array'] = orf_predictions[i]['array']
-        rbs_predictions[i]['array_minus'] = orf_predictions[i]['array_minus']
+    # Identify expressed ORFs
+    expressed_ORFs = []
+    from ORF_predict import find_orfs
+    ORFs = find_orfs(input_file_name, 11, 0)
+    start_codons_fwd = {}   # Value is index in rbs_predictions. Havent checked, probably faster than looping dicts.
+    start_codons_rev = {}
 
-        orf_start = int(orf_predictions[i]['start'])
-        orf_end = int(orf_predictions[i]['end'])
-        orf_length = orf_end - orf_start + 1
-        rbs_score = 10**float(rbs_predictions[i]['score'])
-        rbs_predictions[i]['burden'] = orf_length * rbs_score
+    for i, prediction in enumerate(rbs_predictions):
+        if prediction['strand'] == '+':
+            start_codons_fwd[prediction['position']] = i
+        else:
+            start_codons_rev[prediction['position']] = i
 
-        # Add information to the orf as well
-        orf_predictions[i]['rbs_score'] = rbs_predictions[i]['score']
-        orf_predictions[i]['second_half'] = 'T'
+    for ORF in ORFs:
 
-        ###### CIRCULAR SEQUENCE ######
-        # We need to only add if we are in the second copy,
-        # between sequence_length + 1 and 2 * sequence_length
+
+        if ORF['strand'] == '+':
+            expressed_starts = start_codons_fwd
+            array_minus = 0
+            ORF_array = int(ORF['end']) - int(ORF['start']) + 1
+            offset = 1
+        else:
+            expressed_starts = start_codons_rev
+            array_minus = int(ORF['start']) - int(ORF['end']) + 1
+            ORF_array = 0
+            offset = -1
+
+        ORF_info = ORF
+        orf_length = abs(ORF_info['end'] - ORF_info['start']) + 1
+
+        if str(ORF['start']+offset) in expressed_starts.keys():
+            RBS_info = rbs_predictions[expressed_starts[str(ORF['start']+offset)]]
+            rbs_score = RBS_info['score']
+            if str(rbs_score) in ['inf', '-inf']:
+                continue
+
+            if RBS_info["start_codon"] != ORF_info["start_codon"]:
+                print(f'Codon mismatch {RBS_info["position"]} {RBS_info["start_codon"]} and {ORF_info["start"]} {ORF_info["start_codon"]}, {ORF_info["strand"]}\n{ORF_info["translation"]}')
+
+            expressed_ORFs.append({
+                "start": int(ORF_info['start']),
+                "end": int(ORF_info['end']),
+                "score": rbs_score,
+                "burden": orf_length * rbs_score,
+                "array": ORF_array,
+                "array_minus": array_minus,
+                "second_half": "T",
+                "start_codon": RBS_info["start_codon"],
+                "strand": ORF_info["strand"]
+            })
+    #   When available, assign RBS info to ORF
+            ORF['array'] = ORF_array
+            ORF['array_minus'] = array_minus
+            ORF['rbs_score'] = 10**RBS_info['score']
+            ORF['second_half'] = "T"
+
+        else:
+            rbs_score = 0
+            ORF['array'] = ORF_array
+            ORF['array_minus'] = array_minus
+            ORF['rbs_score'] = rbs_score
+            ORF['second_half'] = "T"
 
         add_to_score = True
-        if options.circular:  # !!! BUG: IF TRUE THIS WILL ERROR
-            if (orf_start <= sequence_length) or (orf_start >= sequence_length * 2 + 1):
+        if options.circular:  # !!! BUG: IF TRUE THIS WILL ERROR @TODO
+            if (int(ORF_info['start']) <= sequence_length) or (int(ORF_info['end']) >= sequence_length * 2 + 1):
                 add_to_score = False
 
         if add_to_score:
-            total_burden = total_burden + rbs_predictions[i]['burden']
-            summary_file.write("  " + str(orf_predictions[i]['start_codon_position']) + " Burden: " +
-                               str(rbs_predictions[i]['burden']) + "[ RBS Score: " + str(rbs_score) +
-                               " + ORF Length: " + str(orf_length) + " ]\n")
+            total_burden += rbs_score * orf_length
+            summary_file.write(f"  {str(ORF_info['start'])} Burden: {str(orf_length * rbs_score)} [ RBS Score: " +
+                               f"{str(rbs_score)} ORF Length: {str(orf_length)} ]\n")
 
     summary_file.write("Total Burden: " + str(total_burden))
 
     # Filter predictions that we show
-    rbs_predictions = list(filter(lambda x:float(x["score"]) > options.rbs_score_cutoff, rbs_predictions))
+    expressed_ORFs = list(filter(lambda x:float(x["score"]) > options.rbs_score_cutoff, expressed_ORFs))
 
     #reload the gene annotation files
     gene_annotations = []
@@ -306,7 +327,7 @@ def main(options):
         writer = csv.DictWriter(
             final_orf_predictions_file,
             fieldnames=["start", "end", "strand", "start_codon", 'length', 'rbs_score',
-                        'array', 'array_minus', 'start_codon_position', 'second_half']
+                        'array', 'array_minus', 'start_codon_position', 'second_half', 'translation']
             )
         writer.writeheader()
         writer.writerows(orf_predictions)
@@ -377,31 +398,33 @@ def main(options):
           )
     )
 
+    negatives_exist = True if "-" in [f['strand'] for f in expressed_ORFs] else False
+    print(f"Negatives exist: {negatives_exist}")
     rbs_series = go.Scatter(
-      x = [f['position'] for f in rbs_predictions],
-      y = [f['score'] for f in rbs_predictions],
+      x = [f['start'] for f in expressed_ORFs],
+      y = [f['score'] for f in expressed_ORFs],
       mode = 'markers',
       text = [ ('start codon:' + d['start_codon'] + "<br>Burden ×10<sup>6</sup>: " +
                 "{0:.6f}".format(d['burden']/1000000) + " (" + "{0:.2f}".format(100*d['burden']/total_burden) + "%}")
-               for d in rbs_predictions],
+               for d in expressed_ORFs],
       name = 'RBS',
       yaxis='y3',
       marker = dict(
-        symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in rbs_predictions],
+        symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in expressed_ORFs],
         size=marker_size,
         color=RBS_color,
       ),
       error_y=dict(
               type='data',
               array=[0],
-              arrayminus=[f['score'] for f in rbs_predictions],
+              arrayminus=[f['score'] for f in expressed_ORFs],
               width=0,
               color=RBS_color,
       ),
       error_x=dict(
               type='data',
-              array=[f['array'] for f in rbs_predictions],
-              arrayminus=[f['array_minus'] for f in rbs_predictions],
+              array=[f['array'] for f in expressed_ORFs],
+              arrayminus=[f['array_minus'] for f in expressed_ORFs],
               width=3,
               color=RBS_color,
       ),
@@ -424,7 +447,7 @@ def main(options):
       name = 'Gene',
       yaxis='y4',
       marker = dict(
-      symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left') for d in gene_annotations],
+      symbol=[ ('triangle-right' if d['strand'] == '+' else 'triangle-left') for d in gene_annotations],
         size=marker_size,
         color=gene_color,
         ),
@@ -479,7 +502,7 @@ def main(options):
       ),
       yaxis3=dict(
           title='log10 RBS score',
-          range = [2, 6],
+          range = [2, 6],   # TODO: Dynamicly set this
           titlefont=dict(
               color=RBS_color
           ),

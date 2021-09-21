@@ -18,6 +18,12 @@ from math import floor
 
 def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
   orfs = []
+
+  if type(seq) == str:
+      for this_seq in SeqIO.parse(seq, "fasta"):
+          seq = this_seq.upper()
+          break
+
   seq_len = len(seq)
 
   #Get the codon table so we know the valid start codons
@@ -47,7 +53,6 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
       end_pos_1 = start_pos_0+floor(float(len(this_seq)-start_pos_0)/3.0)*3
 
       aa_sequence = this_seq[start_pos_0:end_pos_1].seq.translate(translation_table, to_stop=True)
-      #print(aa_sequence)
       aa_length = len(aa_sequence)
 
       end_pos_1 = start_pos_1 + aa_length*3 - 1
@@ -61,14 +66,14 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
       if (this_strand == '-'):
         start_pos_1 = len(this_seq) - start_pos_1 + 1
         end_pos_1 = len(this_seq) - end_pos_1 + 1
-        start_pos_1, end_pos_1 = end_pos_1, start_pos_1
 
       orfs.append(dict(
         start = start_pos_1,
         end = end_pos_1,
         strand = this_strand,
         start_codon = this_start_codon,
-        length = aa_length
+        length = aa_length,
+        translation = aa_sequence
         ))
 
   orfs = sorted(orfs, key=itemgetter('start'))
@@ -94,7 +99,7 @@ def main(options):
     with open(options.o,'w') as final_predictions_file:
       writer = csv.DictWriter(
           final_predictions_file,
-          fieldnames = ["start", "end", "strand", "start_codon", "length"]
+          fieldnames = ["start", "end", "strand", "start_codon", "length", "translation"]
         )
       writer.writeheader()
       writer.writerows(orfs)

@@ -16,7 +16,6 @@ Setup:
 import argparse
 import Bio
 from Bio import SeqIO
-from Bio.Alphabet import generic_dna
 import csv
 import subprocess
 from operator import itemgetter
@@ -64,10 +63,10 @@ def process_RBS_calculator_output_file(input_file_name, is_reverse_complement,
 
       new_entry = {}
 
-      # RBS calculator returns 0-indexed positions
+      # RBS calculator returns 1-indexed positions
       pos_1 = int(split_line[0]) + 1
-      new_entry["position"] =  pos_1 if not is_reverse_complement else sequence_length - pos_1 + 1;
-      new_entry["start_codon"] =  forward_seq[pos_1-1:pos_1+2] if not is_reverse_complement else reverse_seq[pos_1-1:pos_1+2];
+      new_entry["position"] =  pos_1 if not is_reverse_complement else sequence_length - pos_1 + 1
+      new_entry["start_codon"] =  forward_seq[pos_1-2:pos_1+1] if not is_reverse_complement else reverse_seq[pos_1-2:pos_1+1]
       new_entry["strand"] = '-' if is_reverse_complement else '+'
       new_entry["score"] = split_line[1]
       new_entry["score2"] = split_line[2]
@@ -100,61 +99,47 @@ def main(options):
 
   #@TODO: Implement testing requested stop codons and minimum binding screening
     # Three modes possible
-  if options.s:
-    # This one only tests the requested stop codons with parallelism (v. slow for some reason)
-    if os.path.exists(options.o + '.forward.predictions.txt'):
-        os.remove(options.o + '.forward.predictions.txt')
-    if os.path.exists(options.o + '.reverse.predictions.txt'):
-        os.remove(options.o + '.reverse.predictions.txt')
-
-    orf_predictions = []
-    orf_reader = csv.DictReader(open(options.s))
-
-    def _rbs_requested_predictions(orf):
-        orf["start"] = int(orf["start"])
-        if (orf["strand"] == '-'):
-            new_start = len(forward_seq) - int(orf["end"]) + 1
-            new_end = len(forward_seq) - int(orf["start"]) + 1
-            orf["start"] = new_start
-            orf["end"] = new_end
-        # Note: RBS Calculator expects 0-indexed positions
-        sequence = (forward_seq if (orf["strand"] == '+') else reverse_seq)
-        start_loc = int(orf["start"]) - 1
-        end_loc = int(orf["end"]) - 1
-        from RBS_Calculator_Vienna import RBS_Calculator_Vienna
-        findings = RBS_Calculator_Vienna(sequence, constraint_str=None, start_loc=start_loc, end_loc=end_loc)
-        findings = list(findings).append(orf["strand"])
-        return findings
-
-    with concurrent.futures.ThreadPoolExecutor() as multiprocessor:
-        result = multiprocessor.map(_rbs_requested_predictions, orf_reader)
-
-    clean_findings = []  # Remove duplicates
-    [clean_findings.append(finding) for finding in result if finding not in clean_findings]
-    with open(f"{options.o}.forward.predictions.txt", 'w') as _:
-        pass
-    with open(f"{options.o}.reverse.predictions.txt", 'w') as _:
-        pass
-    forward_file = f"{options.o}.forward.predictions.txt", 'w'
-    reverse_file = f"{options.o}.reverse.predictions.txt", 'w'
-    for finding in clean_findings:
-        for (expr, start_pos, ks, dG, dstandby, strand) in finding:
-            if strand == '+':
-                outfile = forward_file
-            else:
-                outfile = reverse_file
-            with open(f"{options.o}.reverse.predictions.txt", 'a') as outfile:
-                outfile.writelines(['1\n', f"{start_pos} {expr} {ks}\n"])
-
-  elif options.e != None:
-    #@TODO: Implement this
-    raise UserWarning('Option E is not yet implemented for ViennaRNA')
+  if False:
     return
   else:
-      #Run RBS Calculator twice on entire sequences. Once for each strand.
-      from RBS_Calculator_Vienna import RBS_Calculator_Vienna
-      RBS_Calculator_Vienna(forward_seq, constraint_str=None, outfile=f"{options.o}.forward.predictions.txt")
-      RBS_Calculator_Vienna(reverse_seq , constraint_str=None, outfile=f"{options.o}.reverse.predictions.txt")
+      #Run OSTIR Calculator twice on entire sequences. Once for each strand.
+      from ostir.ostir import run_ostir
+
+      findings_forward = run_ostir(forward_seq)
+      findings_reverse = run_ostir(reverse_seq)
+
+      for finding in findings_forward:
+          finding['strand'] = "+"
+      for finding in findings_reverse:
+          finding['strand'] = '-'
+
+      result = findings_forward + findings_reverse
+
+      clean_findings = []  # Remove duplicates
+      [clean_findings.append(finding) for finding in result if finding not in clean_findings]
+      # Just cleans the output files
+      with open(f"{options.o}.forward.predictions.txt", 'w') as _:
+          pass
+      with open(f"{options.o}.reverse.predictions.txt", 'w') as _:
+          pass
+      forward_file = f"{options.o}.forward.predictions.txt"
+      reverse_file = f"{options.o}.reverse.predictions.txt"
+      for finding in clean_findings:
+          expr = finding['expression']
+          start_pos = finding['start_position']
+          ks = finding['dG_total']
+          strand = finding['strand']
+          if strand == '+':
+              outfile = forward_file
+          else:
+              outfile = reverse_file
+          with open(outfile, 'a') as file_to_write:
+              file_to_write.writelines(['1\n', f"{start_pos} {expr} {ks}\n"])
+
+
+
+
+
 
 
   # Parse output and create one summary file
