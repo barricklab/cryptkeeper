@@ -15,19 +15,13 @@ executable at $HOME/local/bin
 
 """
 import argparse
-import Bio
-from Bio.SeqIO import FastaIO
-from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
 from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
 import subprocess
 import csv
 from operator import itemgetter
 import os
-import sys
-import warnings
-from cryptkeeper import logger
+from logging import debug, info, warning, error, critical
+
 
 
 def process_Trans_Term_calculator_output_file(input_file_name):
@@ -87,9 +81,6 @@ def process_Trans_Term_calculator_output_file(input_file_name):
 
 def main(options):
     i=0
-    sequence_length = 0
-    forward_seq = ''
-    reverse_seq = ''
 
     for this_seq in SeqIO.parse(options.i, "fasta"):
       i += 1
@@ -106,7 +97,7 @@ def main(options):
     if "TRANSTERM_EXPDAT_PATH" in os.environ:
       transterm_expdat_path = os.getenv("TRANSTERM_EXPDAT_PATH")
     else:
-        logger.warn("Environmental variable $TRANSTERM_EXPDAT_PATH is undefined but necessary"
+        warning("Environmental variable $TRANSTERM_EXPDAT_PATH is undefined but necessary"
                " for TransTerm. Skipping")
         return 2
 

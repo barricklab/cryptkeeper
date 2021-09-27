@@ -14,13 +14,12 @@ import csv
 from operator import itemgetter
 import os
 from copy import deepcopy
+import logging
 
 import plotly
 import plotly.graph_objs as go
 import numpy
-from helpers import Logger
 
-logger = Logger()
 
 def main(options):
     # Makes relative file arguments absolute for more robust execution
@@ -32,9 +31,28 @@ def main(options):
     input_gene_name = ".".join(input_gene_name.split(".")[:-1])
     input_file_name = options.i
 
+    # Set up log
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    stream_formatter = logging.Formatter('[%(asctime)s] Cryptkeeper: %(message)s')
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(stream_formatter)
+    logger.addHandler(stream_handler)
+
+    file_formatter = logging.Formatter('[%(asctime)s - %(levelname)s] Cryptkeeper: %(message)s')
+    file_handler = logging.FileHandler(filename=f"{options.o}.log")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+
+
+
+
     # Convert non-FASTA files to FASTA (supports Genbank)
     if input_file_type != "fasta" and input_file_type != "fna":
-        logger.normal("Non-FASTA file detected. Converting.")
+        logger.info("Non-FASTA file detected. Converting.")
         if input_file_name == "genbank" or input_file_name == "gb":
             with open(input_file_name, "r") as file_in:
                 with open(f"{output_folder + input_gene_name}.fna", "w") as file_converted:
@@ -50,14 +68,14 @@ def main(options):
 
     output_circular_fasta_file_name = options.o + '.circular.3x.fasta'
     if len(sequences) > 1:
-        logger.normal("Input file contains multiple sequences. Only the first will be processed.")
+        logger.warning("Input file contains multiple sequences. Only the first will be processed.")
     sequence_length = len(sequences[0])
     if (options.circular):
         with open(output_circular_fasta_file_name, "w") as output_handle:
             sequences[0].seq = sequences[0].seq + sequences[0].seq + sequences[0].seq
             SeqIO.write([sequences[0]], output_handle, "fasta")
             input_file_name = output_circular_fasta_file_name
-    '''
+    '''  @TODO: Multifata support
     i = 0
     for this_seq in SeqIO.parse(options.i, "fasta"):
         i += 1
@@ -77,7 +95,7 @@ def main(options):
     tss_prediction_file_name = options.o + '.TSS.csv'
 
     if not options.plot_only:
-        logger.normal('Running TTS_predict_BPROM')
+        logger.info('Running TTS_predict_BPROM')
         from TSS_predict_BPROM import TTS_predict_BPROM
         TTS_predict_BPROM(input_file_name, tss_prediction_file_name)
         '''
@@ -102,7 +120,7 @@ def main(options):
     rit_prediction_file_name = options.o + '.RIT.csv'
 
     if not options.plot_only:
-        logger.normal('Running RIT_predict_TransTerm')
+        logger.info('Running RIT_predict_TransTerm')
         from RIT_predict_TransTerm import RIT_predict_TransTerm
         RIT_predict_TransTerm(input_file_name, rit_prediction_file_name)
         '''
@@ -119,7 +137,7 @@ def main(options):
     orf_prediction_file_name = options.o + '.ORF.csv'
 
     if not options.plot_only:
-        logger.normal('Running ORF prediction')
+        logger.info('Running ORF prediction')
         from ORF_predict import ORF_predict
         ORF_predict(input_file_name, orf_prediction_file_name)
         '''
@@ -137,7 +155,7 @@ def main(options):
     rbs_prediction_file_name = options.o + '.RBS.csv'
 
     if not options.plot_only:
-        logger.normal("Running RBS prediction")
+        logger.info("Running RBS prediction")
         from RBS_calc_via_OSTIR import RBS_predict_RBS_Calculator
         RBS_predict_RBS_Calculator(input_file_name, rbs_prediction_file_name, starts=orf_prediction_file_name)
 

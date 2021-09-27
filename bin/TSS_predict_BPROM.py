@@ -4,7 +4,6 @@ import argparse
 import Bio
 from Bio.SeqIO import FastaIO
 from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 import subprocess
@@ -12,8 +11,7 @@ import csv
 from operator import itemgetter
 import re
 import shutil
-import warnings
-from cryptkeeper import logger
+from logging import debug, info, warning, error, critical
 
 # returns a list of dictionaries for the rows
 def process_bprom_output_file(input_file_name, is_reverse_complement, sequence_length):
@@ -58,7 +56,7 @@ def main(options):
 
     # Check if BPROM is installed, otherwise skip
     if not shutil.which('bprom'):
-        logger.warn("BPROM is not properly installed. Skipping.")
+        warning("BPROM is not properly installed. Skipping.")
         return 1
 
     ## global setting - separates names/coords
