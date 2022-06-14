@@ -9,7 +9,7 @@ with open('requirements.txt', 'r') as requirements_file:
 setup(
     name="cryptkeeper",
     version="0.1",
-    packages={"": "bin"},
+    packages=find_packages(),
 
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
@@ -25,9 +25,16 @@ setup(
         "Bug Tracker": "https://github.com/barricklab/cryptkeeper/issues",
         "Source Code": "https://github.com/barricklab/cryptkeeper",
     },
+    include_package_data=True,
     classifiers=[
         "License :: GNU General Public License v2.0"
-    ]
+    ],
+    entry_points={
+        'console_scripts' : [
+          'cryptkeeper = cryptkeeper.cryptkeeper:main',
+          'promocalc = cryptkeeper.promoter_calc.Promoter_Calculator:main',
+        ],
+    }
 
     # could also include long_description, download_url, etc.
 )
