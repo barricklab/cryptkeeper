@@ -17,7 +17,7 @@ from Bio import SeqIO
 import csv
 from operator import itemgetter
 import os
-from helpers import timer_decorator
+from .helpers import timer
 
 
 def process_RBS_calculator_output_file(input_file_name, is_reverse_complement,
@@ -72,7 +72,7 @@ def process_RBS_calculator_output_file(input_file_name, is_reverse_complement,
 
     return(entry_list)
 
-@timer_decorator
+
 def main(options):
     script_path = os.path.dirname(os.path.realpath(__file__))
     start_codons = ['ATG', 'GTG', 'TTG']
@@ -131,6 +131,7 @@ def main(options):
                             outfile = reverse_file
                     with open(outfile, 'a') as file_to_write:
                             file_to_write.writelines(['1\n', f"{start_pos} {expr} {ks}\n"])
+
     # Parse output and create one summary file
     forward_list = process_RBS_calculator_output_file(options.o +'.forward.predictions.txt', False, sequence_length, forward_seq, reverse_seq)
     reverse_list = process_RBS_calculator_output_file(options.o +'.reverse.predictions.txt', True, sequence_length, forward_seq, reverse_seq)

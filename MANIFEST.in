@@ -1,0 +1,3 @@
+include cryptkeeper/promoter_calc/free_energy_coeffs.npy
+include cryptkeeper/promoter_calc/model_intercept.npy
+include cryptkeeper/promoter_calc/LICENSE
