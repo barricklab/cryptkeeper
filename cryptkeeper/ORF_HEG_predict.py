@@ -13,7 +13,6 @@ from Bio import SeqIO
 import Bio.Data.CodonTable
 from operator import itemgetter
 import csv
-from CAI import CAI, relative_adaptiveness
 import os
 import re
 
@@ -120,8 +119,6 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
       orf_seq = this_seq[start_pos_0:end_pos_1]
       orf_seq = str(orf_seq.seq)
 
-      cai = CAI(sequence = orf_seq, reference = fasta_ref)  
-
       if (this_strand == '-'):
         start_pos_1 = len(this_seq) - start_pos_1 + 1
         end_pos_1 = len(this_seq) - end_pos_1 + 1
@@ -132,8 +129,7 @@ def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
         end = end_pos_1,
         strand = this_strand,
         start_codon = this_start_codon,
-        length = aa_length,
-        cai = cai
+        length = aa_length
         ))
         
   orfs = sorted(orfs, key=itemgetter('start')) 
