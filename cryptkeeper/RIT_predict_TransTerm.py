@@ -83,23 +83,36 @@ def main(options):
     i=0
 
     for this_seq in SeqIO.parse(options.i, "fasta"):
-      i += 1
-      if (i>1):
-        exit()
-      main_seq = this_seq.upper()
+        i += 1
+        if (i>1):
+            exit()  # TODO: Asess whether or not exit is appropriate here?
+        main_seq = this_seq.upper()
 
     #unique step, create dummy cords files so that entire sequence is downstream of genes on both strands
     with open(options.o + '.dummy.coords','w') as dummy_coords_file:
-      dummy_coords_file.write('gene1 1 2 ' + main_seq.id + '\n')
-      dummy_coords_file.write('gene2 ' + str(len(main_seq)) + ' ' + str(len(main_seq)-1) + ' ' + main_seq.id + '\n')
+        dummy_coords_file.write('gene1 1 2 ' + main_seq.id + '\n')
+        dummy_coords_file.write('gene2 ' + str(len(main_seq)) + ' ' + str(len(main_seq)-1) + ' ' + main_seq.id + '\n')
 
     transterm_expdat_path = ''
+    transterm_path = subprocess.check_output(['which', 'transterm']).strip()
     if "TRANSTERM_EXPDAT_PATH" in os.environ:
-      transterm_expdat_path = os.getenv("TRANSTERM_EXPDAT_PATH")
-    else:
-        warning("Environmental variable $TRANSTERM_EXPDAT_PATH is undefined but necessary"
-               " for TransTerm. Skipping")
+        transterm_expdat_path = os.getenv("TRANSTERM_EXPDAT_PATH")
+    elif transterm_path:
+        try:
+            # which transterm
+            transterm_path = subprocess.check_output(['which', 'transterm']).strip()
+            transterm_expdat_path = os.path.normpath(transterm_path)
+            transterm_expdat_path = transterm_expdat_path.split(os.sep)
+            transterm_expdat_path = os.sep.join(transterm_expdat_path[:-2]) + os.sep +  "data" + os.sep + 'expterm.dat'
+        except:  # TODO: catch specific exception
+            transterm_path = None
+            
+    if not transterm_expdat_path:
+        warning("Could not detect transterm installation. Please verify that transterm is installed via conda or that the environment variable TRANSTERM_EXPDAT_PATH is set correctly.")
         return 2
+
+    if isinstance(transterm_expdat_path, bytes):
+        transterm_expdat_path = transterm_expdat_path.decode('utf-8')
 
     #run once for predictions on both strands
     print('transterm  -p ' + transterm_expdat_path + ' ' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
@@ -114,12 +127,11 @@ def main(options):
     final_list = sorted(final_list, key=itemgetter('start'))
 
     with open(options.o,'w') as final_predictions_file:
-      writer = csv.DictWriter(
+        writer = csv.DictWriter(
           final_predictions_file,
-          fieldnames = ["start", "end", "strand", "conf", "hairpin_score", "tail_score", "seq_upstream", "seq_hairpin_open", "seq_hairpin_loop", "seq_hairpin_close", "seq_tail"]
-        )
-      writer.writeheader()
-      writer.writerows(final_list)
+          fieldnames = ["start", "end", "strand", "conf", "hairpin_score", "tail_score", "seq_upstream", "seq_hairpin_open", "seq_hairpin_loop", "seq_hairpin_close", "seq_tail"])
+        writer.writeheader()
+        writer.writerows(final_list)
     final_predictions_file.close()
 
 def RIT_predict_TransTerm(input, output):
