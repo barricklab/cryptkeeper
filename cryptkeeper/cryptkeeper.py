@@ -9,18 +9,20 @@ Predict cryptic bacterial gene expression signals in an input sequence.
 """
 
 import argparse
-from Bio import SeqIO
 import csv
-from operator import itemgetter
 import os
-from copy import deepcopy
 import logging
 import plotly
 import plotly.graph_objs as go
 import numpy
 
-from .TSS_predict_BPROM import TTS_predict_BPROM
+from Bio import SeqIO
+from operator import itemgetter
+from copy import deepcopy
+from collections import namedtuple
+
 from .TTS_predict_promoter_calculator import tts_predict
+from rhotermpredict import rho_term_predict
 from .RIT_predict_TransTerm import RIT_predict_TransTerm
 from .ORF_predict import ORF_predict
 from .RBS_calc_via_OSTIR import RBS_predict_RBS_Calculator
@@ -96,7 +98,7 @@ def main():
     # ------------------------------------------------------------------------------
     options = parser.parse_args()
 
-    cryptkeeper(input = options.i,
+    cryptkeeper(input_file = options.i,
                 output=options.o,
                 circular=options.circular,
                 plot_only=options.plot_only,
@@ -104,7 +106,7 @@ def main():
                 rbs_score_cutoff=options.rbs_score_cutoff,
                 web=options.web)
 
-def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, rbs_score_cutoff=2.0, web=False):
+def cryptkeeper(input_file, output=None, circular=False, plot_only=False, name=None, rbs_score_cutoff=2.0, web=False):
 
     # @TODO: Many of these steps should be moved to a function
 
@@ -114,7 +116,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
 
     # Makes relative file arguments absolute for more robust execution
 
-    input_sequence = os.path.abspath(input)
+    input_sequence = os.path.abspath(input_file)
     output_path = os.path.abspath(output)
     output_folder = "/".join(output_path.split("/")[:-1])
     input_gene_name = input_sequence.split("/")[-1]
@@ -143,8 +145,8 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
     if input_file_type != "fasta" and input_file_type != "fna":
         logger.info("Non-FASTA file detected. Converting.")
         if input_file_type in ['genbank', 'gb', 'gbk']:
-            with open(input_file_name, "r") as file_in:
-                with open(f"{output_path + '.' + input_gene_name}.fna", "w") as file_converted:
+            with open(input_file_name, "r", encoding="utf-8" ) as file_in:
+                with open(f"{output_path + '.' + input_gene_name}.fna", "w", encoding="utf-8") as file_converted:
                     sequences = SeqIO.parse(file_in, "genbank")
                     sequences = SeqIO.write(sequences, file_converted, "fasta")
             infile = f"{output_path + '.' + input_gene_name}.fna"
@@ -165,7 +167,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
         logger.warning("Input file contains multiple sequences. Only the first will be processed.")
     sequence_length = len(sequences[0])
     if (circular):
-        with open(output_circular_fasta_file_name, "w") as output_handle:
+        with open(output_circular_fasta_file_name, "w", encoding="utf-8" ) as output_handle:
             sequences[0].seq = sequences[0].seq + sequences[0].seq + sequences[0].seq
             SeqIO.write([sequences[0]], output_handle, "fasta")
             input_file_name = output_circular_fasta_file_name
@@ -229,9 +231,44 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
         if i > 1:
             exit()
         main_seq = this_seq.upper()
+        seq_name = this_seq.id
 
 
     # @TODO: These should directly report data instead of going through an intermediate file
+
+    # ------------------------------------------------------------------------------
+    # PERFORM TERMINATOR PREDICTIONS
+    # ------------------------------------------------------------------------------
+
+    # Predict terminators
+    rit_prediction_file_name = output_path + '.RIT.csv'
+
+
+    RhoTermPredict_out = output_path
+    if not plot_only:
+        logger.info('Running RhoTermPredict')
+        rho_term_predict(input_file_name, RhoTermPredict_out)  # Run RhoTermPredict 
+        # Load RhoTermPredict output into named tuple
+    RhoTermPredict_out += f"RhoTermPredict_{seq_name}.csv"
+
+
+    if not plot_only:
+        logger.info('Running RIT_predict_TransTerm')
+        RIT_predict_TransTerm(input_file_name, rit_prediction_file_name)
+
+    rit_transterm_predictions = []
+    if os.path.isfile(rit_prediction_file_name):
+        rit_reader = csv.DictReader(open(rit_prediction_file_name, encoding="utf-8" ))
+        for row in rit_reader:
+            rit_transterm_predictions.append(row)
+
+
+    rit_rhotermpredict_predictions = []
+    if os.path.isfile(RhoTermPredict_out):
+        rit_reader = csv.DictReader(open(RhoTermPredict_out, encoding="utf-8" ))
+        for row in rit_reader:
+            rit_rhotermpredict_predictions.append(row)
+
     # ------------------------------------------------------------------------------
     # PERFORM PROMOTER PREDICTION
     # ------------------------------------------------------------------------------
@@ -244,6 +281,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
         #TTS_predict_BPROM(input_file_name, tss_prediction_file_name)
         logger.info('Running TSS_predict_promoter_calculator')
         tss_predictions = tts_predict(main_seq, tss_prediction_file_name)
+
 
     '''
     tss_predictions = []
@@ -259,23 +297,6 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
     '''
 
     # ------------------------------------------------------------------------------
-    # PERFORM TERMINATOR PREDICTION
-    # ------------------------------------------------------------------------------
-
-    # Predict terminators
-    rit_prediction_file_name = output_path + '.RIT.csv'
-
-    if not plot_only:
-        logger.info('Running RIT_predict_TransTerm')
-        RIT_predict_TransTerm(input_file_name, rit_prediction_file_name)
-
-    rit_predictions = []
-    if os.path.isfile(rit_prediction_file_name):
-        rit_reader = csv.DictReader(open(rit_prediction_file_name))
-        for row in rit_reader:
-            rit_predictions.append(row)
-
-    # ------------------------------------------------------------------------------
     # PERFORM ORF PREDICTION / GENERATE ANNOTATION FILE
     # ------------------------------------------------------------------------------
 
@@ -289,7 +310,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
 
     orf_predictions = []
     if os.path.isfile(orf_prediction_file_name):
-        orf_reader = csv.DictReader(open(orf_prediction_file_name))
+        orf_reader = csv.DictReader(open(orf_prediction_file_name, encoding="utf-8" ))
         for row in orf_reader:
             row['start_codon_position'] = int(row['start'] if row['strand'] == '+' else row['end'])
             orf_predictions.append(row)
@@ -315,7 +336,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
 
     # Combine ORF and RBS predictions AND calculate the crypt score
     rbs_predictions = []
-    rbs_reader = csv.DictReader(open(rbs_prediction_file_name))
+    rbs_reader = csv.DictReader(open(rbs_prediction_file_name, encoding="utf-8" ))
 
     # Find ORFs with predicted RBS and append their scores. @croots: Bad things happen if you throw the whole seq at OSTIR
     for row in rbs_reader:
@@ -324,11 +345,12 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
 
     total_burden = 0
 
+
     # ------------------------------------------------------------------------------
 
 
     summary_file_name = output_path + '.summary.txt'
-    summary_file = open(summary_file_name, 'w')
+    summary_file = open(summary_file_name, 'w', encoding="utf-8" )
 
 
     # Identify expressed ORFs
@@ -411,7 +433,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
     #reload the gene annotation files
     gene_annotations = []
     if os.path.isfile(gene_annotation_file_name):
-        gene_reader = csv.DictReader(open(gene_annotation_file_name))
+        gene_reader = csv.DictReader(open(gene_annotation_file_name, encoding="utf-8" ))
         for row in gene_reader:
             row['position'] = row['end'] if row['strand'] == '+' else row['start']
             row['array'] = 0 if row['strand'] == '+' else int(row['end']) - int(row['start'])
@@ -429,8 +451,8 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
                                                 (int(x['position']) <= sequence_length * 2), rbs_predictions))
         tss_predictions = list(filter(lambda x: (int(x['TSSpos']) >= sequence_length + 1) and
                                                 (int(x['TSSpos']) <= sequence_length * 2), tss_predictions))
-        rit_predictions = list(filter(lambda x: (int(x['end']) >= sequence_length + 1) and
-                                                (int(x['end']) <= sequence_length * 2), rit_predictions))
+        rit_transterm_predictions = list(filter(lambda x: (int(x['end']) >= sequence_length + 1) and
+                                                (int(x['end']) <= sequence_length * 2), rit_transterm_predictions))
 
         # Correct coordinates of remaining
 
@@ -440,7 +462,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
         for d in tss_predictions:
             d['TSSpos'] = str(int(d['TSSpos']) - sequence_length)
 
-        for d in rit_predictions:
+        for d in rit_transterm_predictions:
             d['end'] = str(int(d['end']) - sequence_length)
 
         # Split reading frames and assign
@@ -465,7 +487,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
         orf_predictions.extend(added_split_orfs)
 
     # logger.normal out entire changed lists - for graphing outside of this program in R, etc.
-    with open(output_path + ".final.ORF.csv",'w') as final_orf_predictions_file:
+    with open(output_path + ".final.ORF.csv",'w', encoding="utf-8" ) as final_orf_predictions_file:
         writer = csv.DictWriter(
             final_orf_predictions_file,
             fieldnames=["start", "end", "strand", "start_codon", 'length', 'rbs_score',
@@ -475,7 +497,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
         writer.writerows(orf_predictions)
         final_orf_predictions_file.close()
 
-    with open(output_path + ".final.RBS.csv", 'w') as final_rbs_predictions_file:
+    with open(output_path + ".final.RBS.csv", 'w', encoding="utf-8" ) as final_rbs_predictions_file:
         writer = csv.DictWriter(
             final_rbs_predictions_file,
             fieldnames=["position", "strand", "start_codon", "score", "score2", "burden", "array", "array_minus"]
@@ -494,20 +516,12 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
     tss_score_max = 8000
 
 
-    # Get the TTS scores and sort, then print it
-    tss_scores = [d.score for d in tss_predictions]
-    tss_scores.sort(reverse=True)
-    print("\nTop TSS Scores:")
-    for i in range(min(len(tss_scores), 10)):
-        print(f"  {tss_scores[i]}")
-
-
     tss_series = go.Scatter(
       x = [d.TSSpos for d in tss_predictions],
       y = [d.score for d in tss_predictions],
       mode = 'markers',
       name = 'TSS',
-      text = [ (f'Score: {d.score}<br>-35: {d.box35seq}<br>-10: {d.box10seq}')  for d in tss_predictions],
+      text = [ (f'Score: {d.score}<br>-35: {d.box35seq}<br>-10: {d.box10seq}')  for d in tss_predictions],  # TODO Change this up for Rho dependant?
       marker = dict(
         symbol=[ ('triangle-right'  if d.strand == '+' else 'triangle-left')  for d in tss_predictions],
         size=marker_size,
@@ -523,24 +537,46 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
             )
     )
 
-    rit_series = go.Scatter(
-      x = [e['end'] for e in rit_predictions],
-      y = [e['conf'] for e in rit_predictions],
+    rit_transterm_series = go.Scatter(
+      x = [int(e['end']) for e in rit_transterm_predictions],
+      y = [int(e['conf']) for e in rit_transterm_predictions],
       mode = 'markers',
       name = 'RIT',
+      yaxis='y2',
       text = [ ('hairpin score:' + d['hairpin_score'] + '; tail score:' + d['tail_score'] + '<br>' +
                 d['seq_hairpin_open'] + '-' + d['seq_hairpin_loop'] + '-' + d['seq_hairpin_close'] +
-                '-' + d['seq_tail'][0:7] )  for d in rit_predictions],
-      yaxis='y2',
+                '-' + d['seq_tail'][0:7] )  for d in rit_transterm_predictions],
       marker = dict(
-        symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in rit_predictions],
+        symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in rit_transterm_predictions],
         size=marker_size,
         color=RIT_color,
       ),
       error_y=dict(
               type='data',
               array=[0],
-              arrayminus=[e['conf'] for e in rit_predictions],
+              arrayminus=[e['conf'] for e in rit_transterm_predictions],
+              width=0,
+              color=RIT_color,
+          )
+    )
+
+
+    rdt_rhotermpredict_series = go.Scatter(
+      x = [int(e['end_rut']) for e in rit_rhotermpredict_predictions],
+      y = [int(e['score_sum']) for e in rit_rhotermpredict_predictions],
+      mode = 'markers',
+      name = 'RDT',
+      yaxis='y6',
+      text = [ ('placeholder')  for d in rit_rhotermpredict_predictions],
+      marker = dict(
+        symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in rit_rhotermpredict_predictions],
+        size=marker_size,
+        color=RIT_color,
+      ),
+      error_y=dict(
+              type='data',
+              array=[0],
+              arrayminus=[e['score_sum'] for e in rit_rhotermpredict_predictions],
               width=0,
               color=RIT_color,
           )
@@ -643,14 +679,11 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
                                               fillcolor=features_dict[feature]['color']
                                               ))
 
-
-
-
     ## Use display name at command line if it was given, otherwise file name
     if name:
-      display_name = name
+        display_name = name
     else:
-      display_name = input_file_name
+        display_name = input_file_name
 
     layout = go.Layout(
       title='CryptKeeper Results: ' + display_name + "  Burden ×10<sup>6</sup>: " + "{0:.2f}".format(total_burden/1000000),
@@ -672,7 +705,7 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
       ),
       yaxis2=dict(
           title='RIT score',
-          range = [0, 110],
+          range = [0, 200],
           titlefont=dict(
               color=RIT_color
           ),
@@ -730,8 +763,23 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
             showticklabels=False,
             overlaying='y',
         ),
+        yaxis6=dict(
+            title='RDT Score',
+            range = [0, 300],
+          titlefont=dict(
+              color=RIT_color
+          ),
+          tickfont=dict(
+              color=RIT_color
+          ),
+          anchor='free',
+          overlaying='y',
+          side='left',
+          position=0.05,
+        ),
+        
     )
-    data = [tss_series, rit_series, rbs_series, nucleotide_sequence]
+    data = [tss_series, rit_transterm_series, rbs_series, nucleotide_sequence, rdt_rhotermpredict_series]
     data.extend(feature_annotations)
 
     fig = dict( data=data, layout=layout )
@@ -739,12 +787,15 @@ def cryptkeeper(input, output=None, circular=False, plot_only=False, name=None, 
     #if (pdf):
     #  fig.write_image(output_path+'.pdf')
     if (web):
-      dev_content = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
-      f = open(output_path+'.plot.div', 'w')
-      f.write(dev_content)
-      f.close()
+        dev_content = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+        f = open(output_path+'.plot.div', 'w')
+        f.write(dev_content)
+        f.close()
     else:
-      plotly.offline.plot(fig, filename=output_path+'.plot.html')
+        plotly.offline.plot(fig, filename=output_path+'.plot.html')
+
+
+    return expressed_ORFs, tss_predictions, rit_rhotermpredict_predictions, rit_transterm_predictions
 
 
 if __name__ == "__main__":

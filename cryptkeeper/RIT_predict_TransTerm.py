@@ -98,15 +98,12 @@ def main(options):
     if "TRANSTERM_EXPDAT_PATH" in os.environ:
         transterm_expdat_path = os.getenv("TRANSTERM_EXPDAT_PATH")
     elif transterm_path:
-        try:
-            # which transterm
-            transterm_path = subprocess.check_output(['which', 'transterm']).strip()
-            transterm_expdat_path = os.path.normpath(transterm_path)
-            transterm_expdat_path = transterm_expdat_path.split(os.sep)
-            transterm_expdat_path = os.sep.join(transterm_expdat_path[:-2]) + os.sep +  "data" + os.sep + 'expterm.dat'
-        except:  # TODO: catch specific exception
-            transterm_path = None
-            
+        # Find the expterm.dat file
+        transterm_path = subprocess.check_output(['which', 'transterm']).strip()
+        transterm_expdat_path = os.path.normpath(transterm_path).decode('utf-8')
+        transterm_expdat_path = transterm_expdat_path.split(os.sep)
+        transterm_expdat_path = os.sep.join(transterm_expdat_path[:-2]) + os.sep +  "data" + os.sep + 'expterm.dat'
+
     if not transterm_expdat_path:
         warning("Could not detect transterm installation. Please verify that transterm is installed via conda or that the environment variable TRANSTERM_EXPDAT_PATH is set correctly.")
         return 2
@@ -115,8 +112,8 @@ def main(options):
         transterm_expdat_path = transterm_expdat_path.decode('utf-8')
 
     #run once for predictions on both strands
-    print('transterm  -p ' + transterm_expdat_path + ' ' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
-    subprocess.call('transterm  -p ' + transterm_expdat_path + ' ' + options.i + ' ' + options.o + '.dummy.coords > ' + options.o + '.predictions.txt', shell = True)
+    print('transterm --min-conf=70  -p ' + transterm_expdat_path + ' ' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
+    subprocess.call('transterm --min-conf=70  -p ' + transterm_expdat_path + ' ' + options.i + ' ' + options.o + '.dummy.coords > ' + options.o + '.predictions.txt', shell = True)
 
     #returns a list of dictionaries for the rows
   

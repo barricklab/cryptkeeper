@@ -24,7 +24,6 @@ def tts_predict(inseq, outfile):
     # Promoter calculator wants the input to be a string
     inseq = str(inseq.seq)
     results = call_predict(inseq, quiet=True)
-    print(len(results))
 
     # Write the results to the outfile
     outdata = namedtuple('tss_prediction', 'seq score strand TSSpos box35pos box35seq box10pos box10seq')
@@ -43,7 +42,6 @@ def tts_predict(inseq, outfile):
     
     # Sort the list by coordinate
     final_list = sorted(final_list, key=attrgetter('TSSpos'))
-    print(len(final_list))
 
 
     with open(outfile,'w') as final_predictions_file:
