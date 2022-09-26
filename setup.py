@@ -1,11 +1,5 @@
 from setuptools import setup, find_packages
 
-# Gets Dependencies
-with open('requirements.txt', 'r') as requirements_file:
-    requirements = []
-    for line in requirements_file:
-        requirements.append(line.strip())
-
 setup(
     name="cryptkeeper",
     version="0.1",
@@ -13,7 +7,7 @@ setup(
 
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
-    install_requires=requirements,
+    install_requires=['ostir', 'rhotermpredict', 'promotercalculator', 'plotly'],
 
     # metadata to display on PyPI
     author="Barrick Lab",

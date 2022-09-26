@@ -106,6 +106,7 @@ def main():
                 rbs_score_cutoff=options.rbs_score_cutoff,
                 web=options.web)
 
+
 def cryptkeeper(input_file, output=None, circular=False, plot_only=False, name=None, rbs_score_cutoff=2.0, web=False):
 
     # @TODO: Many of these steps should be moved to a function
@@ -244,19 +245,18 @@ def cryptkeeper(input_file, output=None, circular=False, plot_only=False, name=N
     rit_prediction_file_name = output_path + '.RIT.csv'
 
 
-    RhoTermPredict_out = output_path
+    RhoTermPredict_out = output_path+'_rtp.csv'
     if not plot_only:
         logger.info('Running RhoTermPredict')
-        rho_term_predict(input_file_name, RhoTermPredict_out)  # Run RhoTermPredict 
+        rho_term_predict(inseq=[str(main_seq.seq)], csv_out = RhoTermPredict_out)  # Run RhoTermPredict
         # Load RhoTermPredict output into named tuple
     RhoTermPredict_out += f"RhoTermPredict_{seq_name}.csv"
-
 
     if not plot_only:
         logger.info('Running RIT_predict_TransTerm')
         RIT_predict_TransTerm(input_file_name, rit_prediction_file_name)
 
-    rit_transterm_predictions = []
+    rit_transterm_predictions = []  # Transterm is the only dependency that requires file IO.
     if os.path.isfile(rit_prediction_file_name):
         rit_reader = csv.DictReader(open(rit_prediction_file_name, encoding="utf-8" ))
         for row in rit_reader:
@@ -281,20 +281,6 @@ def cryptkeeper(input_file, output=None, circular=False, plot_only=False, name=N
         #TTS_predict_BPROM(input_file_name, tss_prediction_file_name)
         logger.info('Running TSS_predict_promoter_calculator')
         tss_predictions = tts_predict(main_seq, tss_prediction_file_name)
-
-
-    '''
-    tss_predictions = []
-    if tts_out:
-        tts_predictions = {i: {'start': tts_out[i]['start'], 'end': tts_out[i]['end'], 'strand': tts_out[i]['strand']} for i in tts_out}
-    if os.path.isfile(tss_prediction_file_name):
-        tss_reader = csv.DictReader(open(tss_prediction_file_name))
-        for row in tss_reader:
-            tss_predictions.append(row)
-    else:
-        print('outfile not written')
-    #print(tss_predictions[0])
-    '''
 
     # ------------------------------------------------------------------------------
     # PERFORM ORF PREDICTION / GENERATE ANNOTATION FILE

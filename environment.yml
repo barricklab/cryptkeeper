@@ -1,0 +1,13 @@
+name: cryptkeeper
+channels:
+  - bioconda
+dependencies:
+  - python>=3.9
+  - viennarna=2.4.18
+  - ostir
+  - transtermhp
+  - pip
+  - pip:
+    - rhotermpredict
+    - promotercalculator
+    - plotly
