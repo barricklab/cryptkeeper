@@ -2,15 +2,13 @@
 
 ## Installation
 
-Drop barricklab/RBS-calculator viennaRNA branch files into bid (remember to git ignore).
+Cryptkeeper is currently in development. Adventurous users can install dependencies on their own through other means. The simplest way to install Cryptkeeper is through conda by:
 
-Must be run from same folder as RBS-calculator's rna_turner1999.par file for now
+* Cloning this repository to your machine
+* `conda env create -f environment.yml`
+* `conda activate cryptkeeper`
+* `pip install ./`
 
-### RBS Calculator
-
-### TransTerm
-
-### BPROM
 
 ## Example
 
