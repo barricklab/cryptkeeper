@@ -96,14 +96,15 @@ def main(options):
     orfs = find_orfs(main_seq, translation_table_id, minimum_orf_aa_length)
 
     #write each tuple of list to outfile
-    with open(options.o,'w') as final_predictions_file:
-      writer = csv.DictWriter(
-          final_predictions_file,
-          fieldnames = ["start", "end", "strand", "start_codon", "length", "translation"]
-        )
-      writer.writeheader()
-      writer.writerows(orfs)
-    final_predictions_file.close()
+    if options.o:
+      with open(options.o,'w') as final_predictions_file:
+        writer = csv.DictWriter(
+            final_predictions_file,
+            fieldnames = ["start", "end", "strand", "start_codon", "length", "translation"]
+          )
+        writer.writeheader()
+        writer.writerows(orfs)
+    return orfs
 
 def ORF_predict(input, output, transtable=11, minlength=0):
     # Pretend to be an argument parser
@@ -114,7 +115,8 @@ def ORF_predict(input, output, transtable=11, minlength=0):
     options.o = output
     options.t = transtable
     options.l = minlength
-    main(options)
+    orfs = main(options)
+    return orfs
 
 if __name__ == "__main__":
     # ------------------------------------------------------------------------------
