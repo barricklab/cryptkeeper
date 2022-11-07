@@ -10,11 +10,7 @@ from promoter_calculator import promoter_calculator
 
 
 def ostir(inseq):
-    script_path = os.path.dirname(os.path.realpath(__file__))
-    start_codons = ['ATG', 'GTG', 'TTG']
     #start_codons = ['ATG', 'GTG']
-
-
     i=0
     sequence_length = 0
     forward_seq = ''

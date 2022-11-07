@@ -4,14 +4,14 @@ from typing import NamedTuple
 from typing import List
 import plotly
 import plotly.graph_objs as go
-import numpy
+import csv
 
 @dataclasses.dataclass
 class CryptResults:
     """Cryptkeeper results class"""
     name: str
     sequence: str
-    transcription_sites: List[NamedTuple]
+    translation_sites: List[NamedTuple]
     row_dep_terminators: List[NamedTuple]
     row_ind_terminators: List[NamedTuple]
     promoters: List[NamedTuple]
@@ -22,6 +22,7 @@ class CryptResults:
         plot(self, output_path)
 
     def to_csv(self, output_path: str):
+        '''Export results to csv files'''
         to_csv(self, output_path)
 
 
@@ -36,7 +37,7 @@ def plot(results: CryptResults, output_path: str):
     promoter_calc_predictions = results.promoters
     transterm_predictions = results.row_ind_terminators
     rhotermpredict_predictions = results.row_dep_terminators
-    expressed_ORFs = results.transcription_sites
+    expressed_ORFs = results.translation_sites
     features_list = results.annotations
     total_burden = results.burden
     sequence = results.sequence
@@ -98,7 +99,7 @@ def plot(results: CryptResults, output_path: str):
 
     rdt_rhotermpredict_series = go.Scatter(
       x = [int(e.end_rut) for e in rhotermpredict_predictions],
-      y = [int(e.score_sum()) for e in rhotermpredict_predictions],
+      y = [int(sum(e.scores)) for e in rhotermpredict_predictions],
       mode = 'markers',
       name = 'RDT',
       yaxis='y6',
@@ -111,38 +112,38 @@ def plot(results: CryptResults, output_path: str):
       error_y=dict(
               type='data',
               array=[0],
-              arrayminus=[e.score_sum() for e in rhotermpredict_predictions],
+              arrayminus=[sum(e.scores) for e in rhotermpredict_predictions],
               width=0,
               color=RIT_color,
           )
     )
 
-    negatives_exist = True if "-" in [f['strand'] for f in expressed_ORFs] else False
+    negatives_exist = True if "-" in [f.strand for f in expressed_ORFs] else False
     rbs_series = go.Scatter(
-      x = [f['start'] for f in expressed_ORFs],
-      y = [f['score'] for f in expressed_ORFs],
+      x = [f.start for f in expressed_ORFs],
+      y = [f.expression for f in expressed_ORFs],
       mode = 'markers',
-      text = [ ('start codon:' + d['start_codon'] + "<br>Burden ×10<sup>6</sup>: " +
-                "{0:.6f}".format(d['burden']/1000000) + " (" + "{0:.2f}".format(100*d['burden']/total_burden) + "%}")
+      text = [ ('start codon:' + d.start_codon + "<br>Burden ×10<sup>6</sup>: " +
+                "{0:.6f}".format(d.burden/1000000) + " (" + "{0:.2f}".format(100*d.burden/total_burden) + "%}")
                for d in expressed_ORFs],
       name = 'RBS',
       yaxis='y3',
       marker = dict(
-        symbol=[ ('triangle-right'  if d['strand'] == '+' else 'triangle-left')  for d in expressed_ORFs],
+        symbol=[ ('triangle-right'  if d.strand == '+' else 'triangle-left')  for d in expressed_ORFs],
         size=marker_size,
         color=RBS_color,
       ),
       error_y=dict(
               type='data',
               array=[0],
-              arrayminus=[f['score'] for f in expressed_ORFs],
+              arrayminus=[f.expression for f in expressed_ORFs],
               width=0,
               color=RBS_color,
       ),
       error_x=dict(
               type='data',
-              array=[f['array'] if f['strand'] == '+' else 0 for f in expressed_ORFs],
-              arrayminus=[f['array'] if f['strand'] == '-' else 0 for f in expressed_ORFs],
+              array=[f.array if f.strand == '+' else 0 for f in expressed_ORFs],
+              arrayminus=[f.array if f.strand == '-' else 0 for f in expressed_ORFs],
               width=3,
               color=RBS_color,
       ),
@@ -322,6 +323,36 @@ def plot(results: CryptResults, output_path: str):
     plotly.offline.plot(fig, filename=output_path)
 
 def to_csv(results: CryptResults, output_path: str):
-    raise NotImplementedError("Not implemented yet")
+    """Write results to csv files"""
+    def _csv_writer():
+        with open(writepath, 'w', encoding='utf8') as file:
+            header = dataset[0]._fields
+            writer = csv.writer(file)
+            writer.writerow(header)
+            for data in dataset:
+                writer.writerow(data._asdict().values())
 
+    # Write RBS predictions to CSV
+    # Headers: Position, Strand, Start_codon, score1, score2
+    # @TODO: Make scores descriptive
+    dataset = results.translation_sites
+    writepath = output_path + '_rbs.csv'
+    _csv_writer()
 
+    # Rho Independent Termination to CSV
+    # Headers: Start, end, strand, coef, hairpin score, tail score
+    # old system also has hairpin upstream, open, loop, close, and tail
+    dataset = results.row_ind_terminators
+    writepath = output_path + '_rit.csv'
+    _csv_writer()
+
+    # Promoter Sites:
+    # Headers: Score, strand, TTSpos, box35pos, box35seq, box10pos, box10seq
+    dataset = results.promoters
+    writepath = output_path + '_tss.csv'
+    _csv_writer()
+
+    # Also need to output Rho Dependent Termination to CSV, which is new
+    dataset = results.row_dep_terminators
+    writepath = output_path + '_rdt.csv'
+    _csv_writer()

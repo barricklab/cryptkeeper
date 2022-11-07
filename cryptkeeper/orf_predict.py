@@ -106,12 +106,12 @@ def main(options):
         writer.writerows(orfs)
     return orfs
 
-def ORF_predict(input, output, transtable=11, minlength=0):
+def orf_predict(inseq, output, transtable=11, minlength=0):
     # Pretend to be an argument parser
     class ObjectClass:
         pass
     options = ObjectClass
-    options.i = input
+    options.i = inseq
     options.o = output
     options.t = transtable
     options.l = minlength

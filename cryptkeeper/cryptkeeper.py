@@ -9,20 +9,17 @@ Predict cryptic bacterial gene expression signals in an input sequence.
 """
 
 import argparse
-import csv
 import os
 import logging
 import tempfile
-
-from Bio import SeqIO
 from operator import itemgetter
 from copy import deepcopy
 from collections import namedtuple
-
+from Bio import SeqIO
 from rhotermpredict import rho_term_predict
-from .ORF_predict import ORF_predict, find_orfs
+from .orf_predict import orf_predict, find_orfs
 from .dependency_wrappers import ostir, transterm, promocalc
-from .export import CryptResults, plot
+from .export import CryptResults, plot, to_csv
 
 def main():
     """CLI Entry Point for Cryptkeeper"""
@@ -91,10 +88,12 @@ def main():
                         circular=options.circular,
                         name=options.name,
                         rbs_score_cutoff=options.rbs_score_cutoff)
-
+    
+    to_csv(result, options.o)
     plot(result, options.o + "graph.html")
 
 def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cutoff=2.0):
+    """Predict cryptic bacterial gene expression signals in an input sequence."""
 
     # @TODO: Many of these steps should be moved to a function
 
@@ -109,7 +108,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
     input_file_type = input_gene_name.split(".")[-1]
     input_gene_name = ".".join(input_gene_name.split(".")[:-1])
     input_file_name = input_sequence
-    
+
     if output:
         output_path = os.path.abspath(output)
         output_folder = "/".join(output_path.split("/")[:-1])
@@ -121,7 +120,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
             os.makedirs(output_folder)
     else: # If not output
         output_path = tempfile.tempdir()
-    
+
 
     # Set up log
     logger = logging.getLogger()
@@ -163,7 +162,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
     if len(sequences) > 1:
         logger.warning("Input file contains multiple sequences. Only the first will be processed.")
     sequence_length = len(sequences[0])
-    if (circular):
+    if circular:
         with open(output_circular_fasta_file_name, "w", encoding="utf-8" ) as output_handle:
             sequences[0].seq = sequences[0].seq + sequences[0].seq + sequences[0].seq
             SeqIO.write([sequences[0]], output_handle, "fasta")
@@ -190,11 +189,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
                                         None)
             features_list.append(feature_hit)
 
-
-        # Process nest level for displaying features
-        strandless_features = [feature for feature in features_list if feature.strand not in [1, -1]]
-        forward_features = [feature for feature in features_list if feature.strand == 1]
-        reverse_features = [feature for feature in features_list if feature.strand == -1]
         end_positions = dict()
         #for strand in [strandless_features, forward_features, reverse_features]:  Dont care about organizing this
         for strand in [features_list]:
@@ -214,10 +208,10 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
                         strand[i] = feature._replace(nest_level=level)
                         break
                 if not strand[i].nest_level and strand[i].nest_level != 0:  # Layer 0 is falcey
-                    lowest_level = max([int(n) for n in end_positions.keys()])
+                    lowest_level = max([int(n) for n in end_positions])
                     end_positions[str(lowest_level+1)] = feature.end
                     strand[i] = feature._replace(nest_level=lowest_level+1)
-            for position in end_positions.keys():
+            for position in end_positions:
                 end_positions[position] = "inf"
 
     # Load sequence
@@ -228,7 +222,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
         if i > 1:
             exit()
         main_seq = this_seq.upper()
-        seq_name = this_seq.id
 
 
     # ------------------------------------------------------------------------------
@@ -240,6 +233,28 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
     logger.info('Running RhoTermPredict')
     rhotermpredict_predictions = rho_term_predict(inseq=[str(main_seq.seq)])  # Run RhoTermPredict
     # Load RhoTermPredict output into named tuple
+    rdtresult = namedtuple('rdtresult', """strand,
+                                        c_over_g,
+                                        start_rut,
+                                        end_rut,
+                                        term_seq,
+                                        downstream_seq,
+                                        palindromes,
+                                        pause_concensus,
+                                        scores""")
+    rhotermpredict_results = []
+    for result in rhotermpredict_predictions:
+        rhotermpredict_results.append(rdtresult(result.strand,
+                                                result.c_over_g,
+                                                result.start_rut,
+                                                result.end_rut,
+                                                result.term_seq,
+                                                result.downstream_seq,
+                                                result.palindromes,
+                                                result.pause_concensus,
+                                                result.scores))
+
+
     logger.info('Running RIT_predict_TransTerm')
     transterm_predictions = transterm(input_file_name)
     # ------------------------------------------------------------------------------
@@ -251,13 +266,13 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
     promoter_calc_predictions = promocalc(main_seq)
 
     # ------------------------------------------------------------------------------
-    # PERFORM ORF PREDICTION / GENERATE ANNOTATION FILE
+    # PERFORM orf PREDICTION / GENERATE ANNOTATION FILE
     # ------------------------------------------------------------------------------
 
-    # Predict ORFs
+    # Predict orfs
 
     logger.info('Running ORF prediction')
-    orf_predictions = ORF_predict(input_file_name, output = None)
+    orf_predictions = orf_predict(input_file_name, output = None)
     [hit.update( {'start_codon_position': int(hit['start'] if hit['strand'] == '+' else hit['end'])}) for hit in orf_predictions]
 
     # Re-sort by the start codon position so we are in the same order as RBS
@@ -272,10 +287,10 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
 
     # ------------------------------------------------------------------------------
 
-    # Identify expressed ORFs
-    expressed_ORFs = []
-    expressed_orf = namedtuple("orf_result", "start, end, score, burden, array, array_minus, second_half,")
-    ORFs = find_orfs(input_file_name, 11, 0)
+    # Identify expressed orfs
+    expressed_orfs = []
+    expressed_orf = namedtuple("orf_result", "start, end, expression, burden, dG, array, start_codon, strand")
+    orfs = find_orfs(input_file_name, 11, 0)
     start_codons_fwd = {}   # Value is index in rbs_predictions. Havent checked, probably faster than looping dicts.
     start_codons_rev = {}
 
@@ -287,61 +302,61 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
         else:
             start_codons_rev[prediction.position] = i
 
-    for ORF in ORFs:
+    for orf in orfs:
 
-        if ORF['strand'] == '+':
+        if orf['strand'] == '+':
             expressed_starts = start_codons_fwd
             array_minus = 0
-            ORF_array = int(ORF['end']) - int(ORF['start']) + 1
+            orf_array = int(orf['end']) - int(orf['start']) + 1
             offset = 1
         else:
             expressed_starts = start_codons_rev
-            array_minus = int(ORF['start']) - int(ORF['end']) + 1
-            ORF_array = 0
+            array_minus = int(orf['start']) - int(orf['end']) + 1
+            orf_array = 0
             offset = -1
 
-        ORF_info = ORF
-        orf_length = abs(ORF_info['end'] - ORF_info['start']) + 1
-        if ORF['start']+offset in expressed_starts.keys():
-            RBS_info = rbs_predictions[expressed_starts[ORF['start']+offset]]
-            rbs_score = RBS_info.score
+        orf_info = orf
+        orf_length = abs(orf_info['end'] - orf_info['start']) + 1
+        if orf['start']+offset in expressed_starts.keys():
+            rbs_info = rbs_predictions[expressed_starts[orf['start']+offset]]
+            rbs_score = rbs_info.score
             if str(rbs_score) in ['inf', '-inf']:
                 continue
 
-            if RBS_info.start_codon != ORF_info["start_codon"]:
-                logger.debug(f'Codon mismatch {RBS_info.position} {RBS_info.start_codon} and {ORF_info["start"]} {ORF_info["start_codon"]}, {ORF_info["strand"]}\n{ORF_info["translation"]}')
-
-            array = max(int(ORF['end']) - int(ORF['start']), int(ORF['start']) - int(ORF['end'])) + 1
-            expressed_ORFs.append({
-                "start": int(ORF_info['start']),
-                "end": int(ORF_info['end']),
-                "score": rbs_score,
-                "burden": orf_length * rbs_score,
-                "array": array,
-                "start_codon": RBS_info.start_codon,
-                "strand": ORF_info["strand"]
-            })
+            assert rbs_info.start_codon == orf_info['start_codon']
+            
+            array = max(int(orf['end']) - int(orf['start']), int(orf['start']) - int(orf['end'])) + 1
+            processed_orf = expressed_orf(int(orf_info['start']),
+                                          int(orf_info['end']),
+                                          rbs_score,
+                                          orf_length * rbs_score,
+                                          rbs_info.score2,
+                                          array,
+                                          rbs_info.start_codon,
+                                          orf_info["strand"]
+                                          )
+            expressed_orfs.append(processed_orf)
 
             total_burden += orf_length * rbs_score
 
-    #   When available, assign RBS info to ORF
-            ORF['array'] = ORF_array
-            ORF['array_minus'] = array_minus
-            ORF['rbs_score'] = 10**RBS_info.score
+    #   When available, assign RBS info to orf
+            orf['array'] = orf_array
+            orf['array_minus'] = array_minus
+            orf['rbs_score'] = 10**rbs_info.score
 
         else:
             rbs_score = 0
-            ORF['array'] = ORF_array
-            ORF['array_minus'] = array_minus
-            ORF['rbs_score'] = rbs_score
+            orf['array'] = orf_array
+            orf['array_minus'] = array_minus
+            orf['rbs_score'] = rbs_score
 
         if circular:  # !!! BUG: IF TRUE THIS WILL ERROR @TODO
-            if (int(ORF_info['start']) <= sequence_length) or (int(ORF_info['end']) >= sequence_length * 2 + 1):
-                add_to_score = False
+            if (int(orf_info['start']) <= sequence_length) or (int(orf_info['end']) >= sequence_length * 2 + 1):
+                pass
 
 
     # Filter predictions that we show
-    expressed_ORFs = list(filter(lambda x:float(x["score"]) > rbs_score_cutoff, expressed_ORFs))
+    expressed_orfs = list(filter(lambda x:float(x.expression) > rbs_score_cutoff, expressed_orfs))
 
     # ---- CIRCULAR SEQUENCE ----
 
@@ -359,25 +374,25 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
 
         # Correct coordinates of remaining
 
-        for d in rbs_predictions:
-            d['position'] = str(int(d['position']) - sequence_length)
+        for rbs in rbs_predictions:
+            rbs['position'] = str(int(rbs['position']) - sequence_length)
 
-        for d in promoter_calc_predictions:
-            d['TSSpos'] = str(int(d['TSSpos']) - sequence_length)
+        for rbs in promoter_calc_predictions:
+            rbs['TSSpos'] = str(int(rbs['TSSpos']) - sequence_length)
 
-        for d in transterm_predictions:
-            d.end = str(int(d.end) - sequence_length)
+        for rbs in transterm_predictions:
+            rbs.end = str(int(rbs.end) - sequence_length)
 
         # Split reading frames and assign
         added_split_orfs = []
-        for d in orf_predictions:
-            d['start'] = str(int(d['start']) - sequence_length)
-            d['end'] = str(int(d['end']) - sequence_length)
+        for rbs in orf_predictions:
+            rbs['start'] = str(int(rbs['start']) - sequence_length)
+            rbs['end'] = str(int(rbs['end']) - sequence_length)
 
-            if int(d['end']) > sequence_length:
+            if int(rbs['end']) > sequence_length:
 
-                new_split_orf = deepcopy(d)
-                d['end'] = str(sequence_length)
+                new_split_orf = deepcopy(rbs)
+                rbs['end'] = str(sequence_length)
                 new_split_orf['start'] = "1"
                 new_split_orf['end'] = str(int(new_split_orf['end']) - sequence_length)
 
@@ -389,8 +404,8 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
 
     result = CryptResults(name = name,
                           sequence = main_seq.seq,
-                          transcription_sites = expressed_ORFs,
-                          row_dep_terminators = rhotermpredict_predictions,
+                          translation_sites = expressed_orfs,
+                          row_dep_terminators = rhotermpredict_results,
                           row_ind_terminators = transterm_predictions,
                           promoters =  promoter_calc_predictions,
                           annotations = features_list,
