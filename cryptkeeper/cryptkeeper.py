@@ -180,7 +180,8 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
                 color = feature.qualifiers['ApEinfo_revcolor'][0]
             else:
                 color = "black"
-
+            if not feature.qualifiers.get('label'): # Some features have no label (ex. transcripts from Benchling)
+                continue
             feature_hit = feature_tuple(feature.qualifiers['label'][0],
                                         feature.location.strand,
                                         feature.location.start,
