@@ -161,15 +161,84 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
     # --- CIRCULAR SEQUENCE ---
     # create a 3x version of the FASTA input file
 
-    output_circular_fasta_file_name = output_path + '.circular.3x.fasta'
+
     if len(sequences) > 1:
         logger.warning("Input file contains multiple sequences. Only the first will be processed.")
+
+    
     sequence_length = len(sequences[0])
+
+
     if circular:
+        # If the input sequence is less than 200 bases, use the entire sequence
+        # if the largest overlapping ORF is greater than 200 bases, use that
+        # otherwise, use 200 bases
+        fwd_stop_codons = ['TAA', 'TAG', 'TGA']
+        fwd_start_codons = ['ATG', 'GTG', 'TTG']
+
+        rev_stop_codons = ['TTA', 'CTA', 'TCA']
+        rev_start_codons = ['CAT', 'CAC', 'CAA']
+
+        circular_length = -1
+        junction = sequences[0].seq[-3:] + sequences[0].seq[:3]
+
+        # Find forward strand longest ORF
+        for start_codons, stop_codons in [(fwd_start_codons, fwd_stop_codons), (rev_start_codons, rev_stop_codons)]:
+            found_starts = [None, None, None]
+            found_stops = [None, None, None]
+            if junction[1:4] in start_codons:
+                found_starts[1] = -1
+            if junction[2:5] in start_codons:
+                found_starts[2] = -1
+
+            for e, i in enumerate(range(sequence_length, -1, -1)):
+                if sequences[0].seq[i-3:i] in stop_codons:
+                    frame = e % 3
+                    found_stops[frame] = -1
+                    found_starts[frame] = True
+                elif sequences[0].seq[i-3:i] in start_codons:
+                    frame = e % 3
+                    if found_starts[frame] is None:
+                        found_starts[frame] = True
+                if all(found_starts):
+                    break
+            else: # If no start codon found fill in the gaps
+                for frame, start in enumerate(found_starts):
+                    if not start:
+                        found_stops[i] = -1
+                        found_starts[i] = True
+
+
+            if junction[0:3] in stop_codons:
+                found_stops[0] = -1
+            if junction[1:4] in stop_codons:
+                found_stops[1] = -1
+            if junction[2:5] in stop_codons:
+                found_stops[2] = -1
+            
+            for i in range(0, sequence_length):
+                if sequences[0].seq[i:i+3] in stop_codons:
+                    frame = i % 3
+                    if found_stops[frame] is None:
+                        found_stops[frame] = i
+                if all(found_stops):
+                    break
+
+            overlapping_ORF = max(found_starts)
+            if overlapping_ORF > circular_length:
+                circular_length = overlapping_ORF
+
+        if circular_length < 197:
+            circular_length = 200
+
+        output_circular_fasta_file_name = output_path + '.extended.fasta'
         with open(output_circular_fasta_file_name, "w", encoding="utf-8" ) as output_handle:
-            sequences[0].seq = sequences[0].seq + sequences[0].seq + sequences[0].seq
+            sequences[0].seq = sequences[0].seq[-circular_length:] + sequences[0].seq + sequences[0].seq[:circular_length]
             SeqIO.write([sequences[0]], output_handle, "fasta")
             input_file_name = output_circular_fasta_file_name
+
+
+
 
 
    # Extract annotation information from genbank files
@@ -363,26 +432,26 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
     if circular:
 
         # Remove ones with out of bounds starts/ends/positions (whichever is graphed)
-        orf_predictions = list(filter(lambda x: (int(x['end']) >= sequence_length + 1) and
-                                                (int(x['start']) <= sequence_length * 2), orf_predictions))
+        orf_predictions = list(filter(lambda x: (int(x['end']) >= circular_length + 1) and
+                                                (int(x['start']) <= circular_length + len(single_sequence)), orf_predictions))
 
-        rbs_predictions = list(filter(lambda x: (int(x.position) >= sequence_length + 1) and
-                                                (int(x.position) <= sequence_length * 2), rbs_predictions))
+        rbs_predictions = list(filter(lambda x: (int(x.position) >= circular_length + 1) and
+                                                (int(x.position) <= circular_length + len(single_sequence)), rbs_predictions))
 
-        expressed_orfs = list(filter(lambda x: (int(x.end) >= sequence_length + 1) and
-                                                (int(x.start) <= sequence_length * 2), expressed_orfs))
+        expressed_orfs = list(filter(lambda x: (int(x.end) >= circular_length + 1) and
+                                                (int(x.start) <= circular_length + len(single_sequence)), expressed_orfs))
         
-        promoter_calc_predictions = list(filter(lambda x: (int(x.TSSpos) >= sequence_length + 1) and
-                                                (int(x.TSSpos) <= sequence_length * 2), promoter_calc_predictions))
-        transterm_predictions = list(filter(lambda x: (int(x.end) >= sequence_length + 1) and
-                                                (int(x.end) <= sequence_length * 2), transterm_predictions))
-        rhotermpredict_results = list(filter(lambda x: (int(x.end_rut) >= sequence_length + 1) and
-                                                (int(x.end_rut) <= sequence_length * 2), rhotermpredict_results))
+        promoter_calc_predictions = list(filter(lambda x: (int(x.TSSpos) >= circular_length + 1) and
+                                                (int(x.TSSpos) <= circular_length + len(single_sequence)), promoter_calc_predictions))
+        transterm_predictions = list(filter(lambda x: (int(x.end) >= circular_length + 1) and
+                                                (int(x.end) <= circular_length + len(single_sequence)), transterm_predictions))
+        rhotermpredict_results = list(filter(lambda x: (int(x.end_rut) >= circular_length + 1) and
+                                                (int(x.end_rut) <= circular_length + len(single_sequence)), rhotermpredict_results))
         # Correct coordinates of remaining
 
         for i, rbs in enumerate(rbs_predictions):
             rbs_hit = namedtuple("rbs_hit", "position, start_codon, strand, score, score2")
-            rbs = rbs_hit(str(int(rbs.position) - sequence_length),
+            rbs = rbs_hit(str(int(rbs.position) - circular_length),
                             rbs.start_codon,
                             rbs.strand,
                             rbs.score,
@@ -395,18 +464,18 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
             tss = promoter_calc_result(tss.seq,
                                         tss.score,
                                         tss.strand,
-                                        int(tss.TSSpos) - sequence_length,
-                                        [int(tss.box35pos[0]) - sequence_length, int(tss.box35pos[1]) - sequence_length],
+                                        int(tss.TSSpos) - circular_length,
+                                        [int(tss.box35pos[0]) - circular_length, int(tss.box35pos[1]) - circular_length],
                                         tss.box35seq,
-                                        [int(tss.box10pos[0]) - sequence_length, int(tss.box10pos[1]) - sequence_length],
+                                        [int(tss.box10pos[0]) - circular_length, int(tss.box10pos[1]) - circular_length],
                                         tss.box10seq)
             promoter_calc_predictions[i] = tss
 
         for i, rit in enumerate(transterm_predictions):
             transterm_result = namedtuple("transterm_result", 
                                             "start, end, strand, conf, hairpin_score, tail_score, seq_upstream, seq_hairpin_open, seq_hairpin_close, seq_tail, seq_hairpin_loop")
-            rit = transterm_result(int(rit.start) - sequence_length,
-                                    int(rit.end) - sequence_length,
+            rit = transterm_result(int(rit.start) - circular_length,
+                                    int(rit.end) - circular_length,
                                     rit.strand,
                                     rit.conf,
                                     rit.hairpin_score,
@@ -423,8 +492,8 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
                                                 "strand, c_over_g, start_rut, end_rut, term_seq, palindromes, pause_concensus, scores")
             rdt = rhotermpredict_result(rdt.strand,
                                         rdt.c_over_g,
-                                        int(rdt.start_rut) - sequence_length,
-                                        int(rdt.end_rut) - sequence_length,
+                                        int(rdt.start_rut) - circular_length,
+                                        int(rdt.end_rut) - circular_length,
                                         rdt.term_seq,
                                         rdt.palindromes,
                                         rdt.pause_concensus,
@@ -433,8 +502,8 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
 
         for i, orf in enumerate(expressed_orfs):
             orf_object = namedtuple("orf_result", "start, end, expression, burden, dG, array, start_codon, strand")
-            orf = orf_object(orf.start - sequence_length,
-                        orf.end - sequence_length,
+            orf = orf_object(orf.start - circular_length,
+                        orf.end - circular_length,
                         orf.expression,
                         orf.burden,
                         orf.dG,
@@ -446,15 +515,15 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
         # Split reading frames and assign
         added_split_orfs = []
         for orf in orf_predictions:
-            orf['start'] = int(orf['start']) - sequence_length
-            orf['end'] = int(orf['end']) - sequence_length
+            orf['start'] = int(orf['start']) - circular_length
+            orf['end'] = int(orf['end']) - circular_length
 
-            if int(orf['end']) > sequence_length:
+            if int(orf['end']) > circular_length:
 
                 new_split_orf = deepcopy(orf)
-                orf['end'] = sequence_length
+                orf['end'] = circular_length
                 new_split_orf['start'] = "1"
-                new_split_orf['end'] = int(new_split_orf['end']) - sequence_length
+                new_split_orf['end'] = int(new_split_orf['end']) - circular_length
 
                 added_split_orfs.append(new_split_orf)
         orf_predictions.extend(added_split_orfs)
@@ -470,6 +539,12 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
                           promoters =  promoter_calc_predictions,
                           annotations = features_list,
                           burden = total_burden)
+
+    print(f"Found promoters: {len(promoter_calc_predictions)}")
+    print(f"Found row-independent terminators: {len(transterm_predictions)}")
+    print(f"Found row-dependent terminators: {len(rhotermpredict_results)}")
+    print(f"Found expressed ORFs: {len(expressed_orfs)}")
+
 
     return result
 
