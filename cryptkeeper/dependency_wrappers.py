@@ -26,8 +26,8 @@ def ostir(inseq):
     #Run OSTIR Calculator twice on entire sequences. Once for each strand.
     from ostir.ostir import run_ostir
 
-    findings_forward = run_ostir(forward_seq)
-    findings_reverse = run_ostir(reverse_seq)
+    findings_forward = run_ostir(forward_seq, verbosity=0)
+    findings_reverse = run_ostir(reverse_seq, verbosity=0)
 
     for finding in findings_forward:
         finding['strand'] = "+"

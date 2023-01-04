@@ -42,7 +42,6 @@ def plot(results: CryptResults, output_path: str):
     total_burden = results.burden
     sequence = results.sequence
 
-
     # Display predictions
 
     #settings
