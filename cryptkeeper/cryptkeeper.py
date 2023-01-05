@@ -20,7 +20,7 @@ from Bio import SeqIO
 from rhotermpredict import rho_term_predict
 from .orf_predict import orf_predict, find_orfs
 from .dependency_wrappers import ostir, transterm, promocalc
-from .export import CryptResults, plot, to_csv
+from .export import CryptResults, plot, to_csv, to_summary
 
 def main():
     """CLI Entry Point for Cryptkeeper"""
@@ -91,7 +91,8 @@ def main():
                         rbs_score_cutoff=options.rbs_score_cutoff)
     
     to_csv(result, options.o)
-    plot(result, options.o + "graph.html")
+    to_summary(result, options.o + "_summary.txt")
+    plot(result, options.o + "_graph.html")
 
 def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cutoff=2.0):
     """Predict cryptic bacterial gene expression signals in an input sequence."""

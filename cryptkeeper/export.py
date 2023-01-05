@@ -355,3 +355,15 @@ def to_csv(results: CryptResults, output_path: str):
     dataset = results.row_dep_terminators
     writepath = output_path + '_rdt.csv'
     _csv_writer()
+
+def to_summary(results: CryptResults, output_path: str):
+    """Write summary of results to file"""
+    with open(output_path, 'w') as file:
+        file.write("CryptKeeper Results Summary\n")
+        file.write("Total Burden: " + str(results.total_burden) + "\n")
+        file.write("Predicted Promoters: " + str(len(results.promoters)) + "\n")
+        file.write("Predicted Translation: " + str(len(results.translation_sites)) + "\n")
+        file.write("Predicted Rho Independent Terminators: " + str(len(results.row_ind_terminators)) + "\n")
+        file.write("Total Rho Dependent Terminators: " + str(len(results.row_dep_terminators)) + "\n")
+
+# Blank EOF line
