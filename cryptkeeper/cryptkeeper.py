@@ -92,6 +92,7 @@ def main():
     
     to_csv(result, options.o)
     to_summary(result, options.o + "_summary.txt")
+    result.to_json(options.o + "_results.json")
     plot(result, options.o + "_graph.html")
 
 def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cutoff=2.0):
@@ -184,7 +185,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
         junction = sequences[0].seq[-3:] + sequences[0].seq[:3]
 
         # Find forward strand longest ORF
-        for start_codons, stop_codons in [(fwd_start_codons, fwd_stop_codons), (rev_start_codons, rev_stop_codons)]:
+        for start_codons, stop_codons in [(fwd_start_codons, fwd_stop_codons), (rev_stop_codons, rev_start_codons)]: # Invert start and stop codons for reverse strand
             found_starts = [None, None, None]
             found_stops = [None, None, None]
             if junction[1:4] in start_codons:
@@ -465,15 +466,16 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
 
 
     # Set up the results object
-
     result = CryptResults(name = name,
-                          sequence = single_sequence,
+                          sequence = str(single_sequence),
                           translation_sites = expressed_orfs,
                           row_dep_terminators = rhotermpredict_results,
                           row_ind_terminators = transterm_predictions,
                           promoters =  promoter_calc_predictions,
                           annotations = features_list,
                           burden = total_burden)
+
+    result.to_json("./development/development.json")
 
     print(f"Found promoters: {len(promoter_calc_predictions)}")
     print(f"Found row-independent terminators: {len(transterm_predictions)}")

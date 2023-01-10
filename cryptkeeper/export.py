@@ -5,6 +5,7 @@ from typing import List
 import plotly
 import plotly.graph_objs as go
 import csv
+import json
 
 @dataclasses.dataclass
 class CryptResults:
@@ -24,6 +25,14 @@ class CryptResults:
     def to_csv(self, output_path: str):
         '''Export results to csv files'''
         to_csv(self, output_path)
+
+    def to_summary(self, output_path: str):
+        '''Export results to summary file'''
+        to_summary(self, output_path)
+
+    def to_json(self, output_path: str):
+        '''Export results to json file'''
+        to_json(self, output_path)
 
 
 def plot(results: CryptResults, output_path: str):
@@ -360,10 +369,25 @@ def to_summary(results: CryptResults, output_path: str):
     """Write summary of results to file"""
     with open(output_path, 'w') as file:
         file.write("CryptKeeper Results Summary\n")
-        file.write("Total Burden: " + str(results.total_burden) + "\n")
+        file.write("Total Burden: " + str(results.burden) + "\n")
         file.write("Predicted Promoters: " + str(len(results.promoters)) + "\n")
         file.write("Predicted Translation: " + str(len(results.translation_sites)) + "\n")
         file.write("Predicted Rho Independent Terminators: " + str(len(results.row_ind_terminators)) + "\n")
         file.write("Total Rho Dependent Terminators: " + str(len(results.row_dep_terminators)) + "\n")
+
+def to_json(results: CryptResults, output_path: str):
+    """Write results to json file"""
+    with open(output_path, 'w') as file:
+        json.dump(dataclasses.asdict(results), file, indent=4)
+
+def from_json(input_path: str) -> CryptResults:
+    """Read results from json file and load them into a CryptResults object"""
+    with open(input_path, 'r') as file:
+        # @TODO: Add sanity checking to json file
+        data = json.load(file)
+        return CryptResults(**data)
+
+def plot_dnaplotlib(results: CryptResults, output_path: str):
+    pass
 
 # Blank EOF line
