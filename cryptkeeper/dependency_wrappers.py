@@ -51,7 +51,7 @@ def ostir(inseq):
         score = finding['expression']
         score2 = finding['dG_total']
         if score > 0:
-            processed_data.append(rbs_hit(position, start_codon, strand, np.log10(float(score)), score2))
+            processed_data.append(rbs_hit(position, start_codon, strand, float(score), score2))
 
     return processed_data
 
@@ -161,7 +161,7 @@ def _read_transterm_output(input_file_name):
 
     return entry_list
 
-def promocalc(inseq):
+def promocalc(inseq, threads=1):
 
     """ Runs the promoter-calculator on the input, returns results and writes them to the outfile """
     # Extract the sequence from the input
@@ -169,12 +169,13 @@ def promocalc(inseq):
     # Run the promoter-calculator
     # Promoter calculator wants the input to be a string
     inseq = str(inseq.seq)
-    results = promoter_calculator(inseq, quiet=True)
+    results = promoter_calculator(inseq, threads=threads, verbosity=0)
 
     # Write the results to the outfile
     outdata = namedtuple('promoter_calculator_result', 'seq score strand TSSpos box35pos box35seq box10pos box10seq')
     final_list = []
     for result in results:
+        # Filter out results with a magnitude less than that of -3.7765 (average dG for E. coli is -1.2588)
         # Convert the results to a namedtuple
         result = outdata(result.promoter_sequence,
                          result.Tx_rate, 

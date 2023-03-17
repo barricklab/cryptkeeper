@@ -7,17 +7,22 @@ import plotly.graph_objs as go
 import csv
 import json
 
+CDS_COLOR = '#4b61d1'
+RBS_COLOR = "#d14b4b"
+PROMOTER_COLOR = '#2ab717' 
+TERMINATOR_COLOR = '#ff0000' 
+
 @dataclasses.dataclass
 class CryptResults:
     """Cryptkeeper results class"""
     name: str
     sequence: str
     translation_sites: List[NamedTuple]
-    row_dep_terminators: List[NamedTuple]
-    row_ind_terminators: List[NamedTuple]
+    rho_dep_terminators: List[NamedTuple]
+    rho_ind_terminators: List[NamedTuple]
     promoters: List[NamedTuple]
     annotations: List[NamedTuple]
-    burden: int
+    burden: float
 
     def plot(self, output_path: str):
         plot(self, output_path)
@@ -44,8 +49,8 @@ def plot(results: CryptResults, output_path: str):
     # Unpack results from CryptResults
     name = results.name
     promoter_calc_predictions = results.promoters
-    transterm_predictions = results.row_ind_terminators
-    rhotermpredict_predictions = results.row_dep_terminators
+    transterm_predictions = results.rho_ind_terminators
+    rhotermpredict_predictions = results.rho_dep_terminators
     expressed_ORFs = results.translation_sites
     features_list = results.annotations
     total_burden = results.burden
@@ -54,9 +59,9 @@ def plot(results: CryptResults, output_path: str):
     # Display predictions
 
     #settings
-    TSS_color = '#2ab717'
-    RIT_color = '#ff0000'
-    RBS_color = '#0d30e0'
+    TSS_color = PROMOTER_COLOR
+    RIT_color = TERMINATOR_COLOR
+    RBS_color = CDS_COLOR
     marker_size = 20
     tss_score_max = 8000
 
@@ -333,6 +338,8 @@ def plot(results: CryptResults, output_path: str):
 def to_csv(results: CryptResults, output_path: str):
     """Write results to csv files"""
     def _csv_writer():
+        if not dataset:
+            return
         with open(writepath, 'w', encoding='utf8') as file:
             header = dataset[0]._fields
             writer = csv.writer(file)
@@ -350,7 +357,7 @@ def to_csv(results: CryptResults, output_path: str):
     # Rho Independent Termination to CSV
     # Headers: Start, end, strand, coef, hairpin score, tail score
     # old system also has hairpin upstream, open, loop, close, and tail
-    dataset = results.row_ind_terminators
+    dataset = results.rho_ind_terminators
     writepath = output_path + '_rit.csv'
     _csv_writer()
 
@@ -361,7 +368,7 @@ def to_csv(results: CryptResults, output_path: str):
     _csv_writer()
 
     # Also need to output Rho Dependent Termination to CSV, which is new
-    dataset = results.row_dep_terminators
+    dataset = results.rho_dep_terminators
     writepath = output_path + '_rdt.csv'
     _csv_writer()
 
@@ -372,8 +379,8 @@ def to_summary(results: CryptResults, output_path: str):
         file.write("Total Burden: " + str(results.burden) + "\n")
         file.write("Predicted Promoters: " + str(len(results.promoters)) + "\n")
         file.write("Predicted Translation: " + str(len(results.translation_sites)) + "\n")
-        file.write("Predicted Rho Independent Terminators: " + str(len(results.row_ind_terminators)) + "\n")
-        file.write("Total Rho Dependent Terminators: " + str(len(results.row_dep_terminators)) + "\n")
+        file.write("Predicted Rho Independent Terminators: " + str(len(results.rho_ind_terminators)) + "\n")
+        file.write("Total Rho Dependent Terminators: " + str(len(results.rho_dep_terminators)) + "\n")
 
 def to_json(results: CryptResults, output_path: str):
     """Write results to json file"""
@@ -385,9 +392,35 @@ def from_json(input_path: str) -> CryptResults:
     with open(input_path, 'r') as file:
         # @TODO: Add sanity checking to json file
         data = json.load(file)
-        return CryptResults(**data)
+        results = CryptResults(**data)
 
-def plot_dnaplotlib(results: CryptResults, output_path: str):
-    pass
+    # Correct the data type from the json
+    expressed_orf = namedtuple("orf_result", "start, end, expression, burden, dG, array, start_codon, strand")
+    promocalc_hit = namedtuple('promoter_calculator_result', 'seq score strand TSSpos box35pos box35seq box10pos box10seq')
+    transterm_hit = namedtuple("transterm_result","start end strand conf hairpin_score tail_score seq_upstream seq_hairpin_open seq_hairpin_loop seq_hairpin_close seq_tail")
+    rtp_hit = namedtuple('rdtresult', """strand,
+                                        c_over_g,
+                                        start_rut,
+                                        end_rut,
+                                        term_seq,
+                                        downstream_seq,
+                                        palindromes,
+                                        pause_concensus,
+                                        scores""")
+    annotations = namedtuple('feature', ['name', 'strand', 'start', 'end', 'color', 'nest_level'])
+
+    for i, hit in enumerate(results.translation_sites):
+        results.translation_sites[i] = expressed_orf(*hit)
+    for i, hit in enumerate(results.promoters):
+        results.promoters[i] = promocalc_hit(*hit)
+    for i, hit in enumerate(results.rho_ind_terminators):
+        results.rho_ind_terminators[i] = transterm_hit(*hit)
+    for i, hit in enumerate(results.rho_dep_terminators):
+        results.rho_dep_terminators[i] = rtp_hit(*hit)
+    for i, hit in enumerate(results.annotations):
+        results.annotations[i] = annotations(*hit)
+
+    return results
+
 
 # Blank EOF line

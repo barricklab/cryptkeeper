@@ -12,6 +12,7 @@ import argparse
 import os
 import logging
 import tempfile
+import numpy as np
 from collections import namedtuple
 from operator import itemgetter
 from copy import deepcopy
@@ -52,6 +53,16 @@ def main():
     )
 
     parser.add_argument(
+        '-j', '-threads',
+        action='store',
+        dest='j',
+        required=False,
+        type=int,
+        help="Number of threads/processes to use",
+        default=1
+    )
+
+    parser.add_argument(
         '-p', '--plot-only',
         action='store_true',
         dest='plot_only',
@@ -88,6 +99,7 @@ def main():
                         output=options.o,
                         circular=options.circular,
                         name=options.name,
+                        threads=options.j,
                         rbs_score_cutoff=options.rbs_score_cutoff)
     
     to_csv(result, options.o)
@@ -95,10 +107,14 @@ def main():
     result.to_json(options.o + "_results.json")
     plot(result, options.o + "_graph.html")
 
-def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cutoff=2.0):
+def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, rbs_score_cutoff=2.0):
     """Predict cryptic bacterial gene expression signals in an input sequence."""
 
     # @TODO: Many of these steps should be moved to a function
+
+    # Sanity Checking
+    if threads < 1:
+        raise ValueError("Number of threads must be greater than 0")
 
     # ------------------------------------------------------------------------------
     # PROCESS INPUT FILES
@@ -225,13 +241,19 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
                         found_stops[frame] = i
                 if all(found_stops):
                     break
+            else: # If no stop codon found fill in the gaps
+                for frame, stop in enumerate(found_stops):
+                    if not stop:
+                        found_stops[frame] = -1
 
-            overlapping_ORF = max(found_starts)
+            overlapping_ORF = max(found_stops)
             if overlapping_ORF > circular_length:
                 circular_length = overlapping_ORF
 
         if circular_length < 197:
             circular_length = 200
+        else:
+            circular_length += 3
 
         output_circular_fasta_file_name = output_path + '.extended.fasta'
         with open(output_circular_fasta_file_name, "w", encoding="utf-8" ) as output_handle:
@@ -338,7 +360,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
 
     # Predict promoters
     logger.info('Running TSS_predict_promoter_calculator')
-    promoter_calc_predictions = promocalc(main_seq)
+    promoter_calc_predictions = promocalc(main_seq, threads=threads)
 
     # ------------------------------------------------------------------------------
     # PERFORM orf PREDICTION / GENERATE ANNOTATION FILE
@@ -358,6 +380,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
     # ------------------------------------------------------------------------------
 
     # Predict RBS
+    logger.info('Running RBS prediction')
     rbs_predictions = ostir(input_file_name)
 
     # ------------------------------------------------------------------------------
@@ -394,7 +417,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
         orf_length = abs(orf_info['end'] - orf_info['start']) + 1
         if orf['start']+offset in expressed_starts.keys():
             rbs_info = rbs_predictions[expressed_starts[orf['start']+offset]]
-            rbs_score = rbs_info.score
+            rbs_score = np.log10(rbs_info.score)
             if str(rbs_score) in ['inf', '-inf']:
                 continue
 
@@ -403,8 +426,8 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
             array = max(int(orf['end']) - int(orf['start']), int(orf['start']) - int(orf['end'])) + 1
             processed_orf = expressed_orf(int(orf_info['start']),
                                             int(orf_info['end']),
-                                            rbs_score,
-                                            orf_length * rbs_score,
+                                            rbs_score,  # Log Version
+                                            orf_length * rbs_info.score,  # Non log version
                                             rbs_info.score2,
                                             array,
                                             rbs_info.start_codon,
@@ -412,12 +435,12 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
                                             )
             expressed_orfs.append(processed_orf) 
 
-            total_burden += orf_length * rbs_score
+            total_burden += orf_length * rbs_info.score
 
     #   When available, assign RBS info to orf
             orf['array'] = orf_array
             orf['array_minus'] = array_minus
-            orf['rbs_score'] = 10**rbs_info.score
+            orf['rbs_score'] = 10**rbs_score
 
         else:
             rbs_score = 0
@@ -464,22 +487,19 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, rbs_score_cu
         orf_predictions.extend(added_split_orfs)
         '''
 
-
     # Set up the results object
     result = CryptResults(name = name,
                           sequence = str(single_sequence),
                           translation_sites = expressed_orfs,
-                          row_dep_terminators = rhotermpredict_results,
-                          row_ind_terminators = transterm_predictions,
+                          rho_dep_terminators = rhotermpredict_results,
+                          rho_ind_terminators = transterm_predictions,
                           promoters =  promoter_calc_predictions,
                           annotations = features_list,
                           burden = total_burden)
 
-    result.to_json("./development/development.json")
-
     print(f"Found promoters: {len(promoter_calc_predictions)}")
-    print(f"Found row-independent terminators: {len(transterm_predictions)}")
-    print(f"Found row-dependent terminators: {len(rhotermpredict_results)}")
+    print(f"Found rho-independent terminators: {len(transterm_predictions)}")
+    print(f"Found rho-dependent terminators: {len(rhotermpredict_results)}")
     print(f"Found expressed ORFs: {len(expressed_orfs)}")
 
 
