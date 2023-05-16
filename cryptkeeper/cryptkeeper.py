@@ -143,14 +143,15 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
 
 
     # Set up log
-    logger = logging.getLogger()
+    logger = logging.getLogger('cryptkeeper')
     logger.setLevel(logging.DEBUG)
 
     stream_formatter = logging.Formatter('[%(asctime)s] Cryptkeeper: %(message)s')
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.INFO)
     stream_handler.setFormatter(stream_formatter)
-    logger.addHandler(stream_handler)
+    if not logger. hasHandlers():
+        logger.addHandler(stream_handler)
 
     if output:
         file_formatter = logging.Formatter('[%(asctime)s - %(levelname)s] Cryptkeeper: %(message)s')
@@ -381,7 +382,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
 
     # Predict RBS
     logger.info('Running RBS prediction')
-    rbs_predictions = ostir(input_file_name)
+    rbs_predictions = ostir(input_file_name, threads=threads)
 
     # ------------------------------------------------------------------------------
 
