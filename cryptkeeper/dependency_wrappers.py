@@ -9,7 +9,7 @@ from operator import itemgetter, attrgetter
 from promoter_calculator import promoter_calculator
 
 
-def ostir(inseq):
+def ostir(inseq, threads=1):
     #start_codons = ['ATG', 'GTG']
     i=0
     sequence_length = 0
@@ -26,8 +26,8 @@ def ostir(inseq):
     #Run OSTIR Calculator twice on entire sequences. Once for each strand.
     from ostir.ostir import run_ostir
 
-    findings_forward = run_ostir(forward_seq, verbosity=0)
-    findings_reverse = run_ostir(reverse_seq, verbosity=0)
+    findings_forward = run_ostir(forward_seq, threads=threads, verbosity=0)
+    findings_reverse = run_ostir(reverse_seq, threads=threads, verbosity=0)
 
     for finding in findings_forward:
         finding['strand'] = "+"
@@ -175,7 +175,6 @@ def promocalc(inseq, threads=1):
     outdata = namedtuple('promoter_calculator_result', 'seq score strand TSSpos box35pos box35seq box10pos box10seq')
     final_list = []
     for result in results:
-        # Filter out results with a magnitude less than that of -3.7765 (average dG for E. coli is -1.2588)
         # Convert the results to a namedtuple
         result = outdata(result.promoter_sequence,
                          result.Tx_rate, 
