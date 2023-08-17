@@ -7,7 +7,7 @@ setup(
 
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
-    install_requires=['ostir', 'rhotermpredict', 'promotercalculator', 'plotly'],
+    install_requires=['ostir', 'rhotermpredict', 'promotercalculator', 'plotly', 'bokeh'],
 
     # metadata to display on PyPI
     author="Barrick Lab",

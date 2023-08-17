@@ -22,6 +22,7 @@ from rhotermpredict import rho_term_predict
 from .orf_predict import orf_predict, find_orfs
 from .dependency_wrappers import ostir, transterm, promocalc
 from .export import CryptResults, plot, to_csv, to_summary
+from .export_bokah import export_bokah
 
 def main():
     """CLI Entry Point for Cryptkeeper"""
@@ -85,6 +86,14 @@ def main():
         help="Minimum score that is graphed and output to final files (all are used in calculating burden)",
     )
 
+    parser.add_argument(
+        '--matplotlib',
+        action='store_true',
+        dest='matplotlib',
+        default=False,
+        help="Use MatPlotLib visualization (depricated)",
+    )
+
     # parser.add_argument(
     #    '--pdf',
     #    action='store_true',
@@ -105,7 +114,14 @@ def main():
     to_csv(result, options.o)
     to_summary(result, options.o + "_summary.txt")
     result.to_json(options.o + "_results.json")
-    plot(result, options.o + "_graph.html")
+    print('Finished analysis. Plotting.')
+    if options.matplotlib:
+        DeprecationWarning('Matplotlib base plotting will be replaced with bokah soon')
+        plot(result, options.o + "_graph.html")
+    else:
+        export_bokah(result, options.o + "_graph.html")
+    print('Done')
+    
 
 def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, rbs_score_cutoff=2.0):
     """Predict cryptic bacterial gene expression signals in an input sequence."""
@@ -280,7 +296,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
             if not feature.qualifiers.get('label'): # Some features have no label (ex. transcripts from Benchling)
                             continue
             feature_hit = feature_tuple(feature.qualifiers['label'][0],
-                                        feature.location.strand,
+                                        int(feature.location.strand),
                                         feature.location.start,
                                         feature.location.end,
                                         color,
