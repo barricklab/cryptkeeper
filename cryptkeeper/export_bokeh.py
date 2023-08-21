@@ -11,7 +11,7 @@ from bokeh.layouts import column, row
 
 def plot_boxes(features_list):
 
-    placed_ORFs = pd.DataFrame(columns=["start_x", "stop_x", "start_y", "stop_y", "burden"])
+    placed_ORFs = pd.DataFrame(columns=["start_x", "stop_x", "start_y", "stop_y", "burden", "strand"])
     highest_expression = 0
     highest_burden = 0
 
@@ -19,6 +19,7 @@ def plot_boxes(features_list):
         start_x_adding = int(feature.start)
         stop_x_adding = int(feature.end)
         burden = float(feature.burden)
+        strand = feature.strand
         if burden > highest_burden:
             highest_burden = burden
 
@@ -76,7 +77,7 @@ def plot_boxes(features_list):
             if not about_to_break:
                 failed = False
         
-        placed_ORFs.loc[placed_ORFs.shape[0]] = [start_x_adding, stop_x_adding, start_y_adding, stop_y_adding, burden]
+        placed_ORFs.loc[placed_ORFs.shape[0]] = [start_x_adding, stop_x_adding, start_y_adding, stop_y_adding, burden, strand]
 
 
     # Convert to somethong bokah understands
@@ -86,6 +87,8 @@ def plot_boxes(features_list):
         "w": [],
         "h": [],
         "burden": [],
+        "position": [],
+        "strand": [],
     }
 
     for i in range(placed_ORFs.shape[0]):
@@ -94,9 +97,8 @@ def plot_boxes(features_list):
         bokah_orfs["w"].append(placed_ORFs.loc[i, "stop_x"] - placed_ORFs.loc[i, "start_x"])
         bokah_orfs["h"].append(abs(placed_ORFs.loc[i, "stop_y"] - placed_ORFs.loc[i, "start_y"]))
         bokah_orfs["burden"].append(placed_ORFs.loc[i, "burden"])
-
-
-
+        bokah_orfs["position"].append(f'{placed_ORFs.loc[i, "start_x"]}-{placed_ORFs.loc[i, "stop_x"]}')
+        bokah_orfs["strand"].append(f'{placed_ORFs.loc[i, "strand"]}')
 
     return bokah_orfs, highest_burden
 
@@ -158,6 +160,8 @@ def export_bokeh(cryptresult, filename=None):
                               'y': [],
                               'color': [],
                               'name': [],
+                              'position': [],
+                              'strand': [],
                               }
 
         
@@ -183,6 +187,8 @@ def export_bokeh(cryptresult, filename=None):
             genbank_dictionary['y'].append(ys)
             genbank_dictionary['color'].append(color)
             genbank_dictionary['name'].append(name)
+            genbank_dictionary['position'].append(f'{genbank_annotation.start}-{genbank_annotation.end}')
+            genbank_dictionary['strand'].append(genbank_annotation.strand)
 
         genbank_glyphs = fig.patches('x', 'y', color='color', source=genbank_dictionary, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
         genbank_glyphs_hover = HoverTool(renderers=[genbank_glyphs], tooltips=[("Name", "@name")])
@@ -205,7 +211,7 @@ def export_bokeh(cryptresult, filename=None):
 
         cmap = linear_cmap(field_name='burden', palette=Viridis256, low=0, high=highest_expression)
         rectangles = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range3")
-        rectangles_hover = HoverTool(renderers=[rectangles], tooltips=[("Burden", "@burden")])
+        rectangles_hover = HoverTool(renderers=[rectangles], tooltips=[("Position", "@position"), ("Strand", "@strand"), ("Burden", "@burden")])
         fig.add_tools(rectangles_hover)
 
         color_bar = rectangles.construct_color_bar(padding=0,
