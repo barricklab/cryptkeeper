@@ -8,6 +8,8 @@ from bokeh.transform import linear_cmap, log_cmap
 from bokeh.palettes import Viridis256
 from bokeh.plotting import output_file, save
 from bokeh.layouts import column, row
+from bokeh.events import DocumentReady
+from bokeh.io import curdoc
 
 def plot_boxes(features_list):
 
@@ -242,9 +244,10 @@ def export_bokeh(cryptresult, filename=None):
         promoter_dict = {'x': [],
                      'y': [],
                      'position': [],
-                     'score': []}
+                     'score': [],
+                     'strand': []}
         
-        for promoter in promoters[:10]:
+        for promoter in promoters:
             arrow_shape = ((-10, 0), (10, 0), (10, 400), (50, 400), (50, 350), (100, 450), (50, 550), (50, 500), (-10, 500), (-10, 0))
             if promoter.strand == "-":
                 arrow_shape = [(-x[0], -x[1]) for x in arrow_shape]
@@ -254,11 +257,29 @@ def export_bokeh(cryptresult, filename=None):
             promoter_dict['y'].append(ys)
             promoter_dict['position'].append(promoter.TSSpos)
             promoter_dict['score'].append(promoter.score)
+            promoter_dict['strand'].append(promoter.strand)
 
 
         promoter_glyphs = fig.patches('x', 'y', color='green', source=promoter_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
-        promoter_glyphs_hover = HoverTool(renderers=[promoter_glyphs], tooltips=[("Position", "@position"), ("Score", "@score")])
+        promoter_glyphs_hover = HoverTool(renderers=[promoter_glyphs], tooltips=[("Position", "@position"), ('Strand', '@strand'), ("Score", "@score")])
         fig.add_tools(promoter_glyphs_hover)
+
+        # Add a widget to change the number of promoters shown
+        promoter_number = TextInput(title="Number of promoters", value=str(10))
+        promoter_javascript = """
+                            var originalPromoData = structuredClone(source)
+                            var newNumber = Number(promoter_number.value)
+                            promoter_glyphs.data_source.data['x'] = originalPromoData['x'].slice(0, newNumber)
+                            promoter_glyphs.data_source.data['y'] = originalPromoData['y'].slice(0, newNumber)
+                            promoter_glyphs.data_source.data['position'] = originalPromoData['position'].slice(0, newNumber)
+                            promoter_glyphs.data_source.data['score'] = originalPromoData['score'].slice(0, newNumber)
+                            promoter_glyphs.data_source.data['strand'] = originalPromoData['strand'].slice(0, newNumber)
+                            promoter_glyphs.data_source.change.emit()
+                            """
+        promoter_javascript = CustomJS(args=dict(promoter_glyphs=promoter_glyphs, promoter_number=promoter_number, source=promoter_dict), code=promoter_javascript)
+        curdoc().js_on_event(DocumentReady, promoter_javascript)
+        wigits.append((promoter_number, promoter_javascript))
+
 
     # Add the terminators
     rdpt = cryptresult.rho_dep_terminators
@@ -270,9 +291,10 @@ def export_bokeh(cryptresult, filename=None):
         terminator_dict = {'x': [],
                            'y': [],
                            'position': [],
-                           'score': []}
+                           'score': [],
+                           'strand': []}
         # strand, start_rut, end_rut,  score
-        for terminator in rdpt[0:5]:
+        for terminator in rdpt:
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
             xs = [terminator.start_rut + x[0] for x in t_shape]
@@ -281,10 +303,28 @@ def export_bokeh(cryptresult, filename=None):
             terminator_dict['y'].append(ys)
             terminator_dict['position'].append(f'{terminator.start_rut}-{terminator.end_rut}')
             terminator_dict['score'].append(terminator.scores[0])
+            terminator_dict['strand'].append(terminator.strand)
 
         terminator_glyphs = fig.patches('x', 'y', color='red', source=terminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
-        terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ("Score", "@score")])
+        terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ('Strand', '@strand'), ("Score", "@score")])
         fig.add_tools(terminator_glyphs_hover)
+
+        # Add a widget to change the number of terminators shown
+        rdpt_number = TextInput(title="Number of Rho-Dependant Terminators", value=str(5))
+        rdpt_javascript = """
+                        var originalRDPTData = structuredClone(source)
+                        var newNumber = Number(rdpt_number.value)
+                        rdpt_glyphs.data_source.data['x'] = originalRDPTData['x'].slice(0, newNumber)
+                        rdpt_glyphs.data_source.data['y'] = originalRDPTData['y'].slice(0, newNumber)
+                        rdpt_glyphs.data_source.data['position'] = originalRDPTData['position'].slice(0, newNumber)
+                        rdpt_glyphs.data_source.data['score'] = originalRDPTData['score'].slice(0, newNumber)
+                        rdpt_glyphs.data_source.data['strand'] = originalRDPTData['strand'].slice(0, newNumber)
+                        rdpt_glyphs.data_source.change.emit()
+                        """
+        rdpt_javascript = CustomJS(args=dict(rdpt_glyphs=terminator_glyphs, rdpt_number=rdpt_number, source=terminator_dict), code=rdpt_javascript)
+        curdoc().js_on_event(DocumentReady, rdpt_javascript)
+        wigits.append((rdpt_number, rdpt_javascript))
+
 
     if ridpt:
         ridpt = sorted(ridpt, key=lambda x: x.conf, reverse=True)
@@ -292,8 +332,9 @@ def export_bokeh(cryptresult, filename=None):
         terminator_dict = {'x': [],
                             'y': [],
                             'position': [],
-                            'score': []}
-        for terminator in ridpt[0:5]:
+                            'score': [],
+                            'strand': []}
+        for terminator in ridpt:
             # strand, conf, start, end
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
@@ -303,10 +344,27 @@ def export_bokeh(cryptresult, filename=None):
             terminator_dict['y'].append(ys)
             terminator_dict['position'].append(f'{terminator.start}-{terminator.end}')
             terminator_dict['score'].append(terminator.conf)
+            terminator_dict['strand'].append(terminator.strand)
 
         terminator_glyphs = fig.patches('x', 'y', color='blue', source=terminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
-        terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ("Score", "@score")])
+        terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ('Strand', '@strand'), ("Score", "@score")])
         fig.add_tools(terminator_glyphs_hover)
+
+        # Add a widget to change the number of terminators shown
+        ridpt_number = TextInput(title="Number of Rho-Inependant Terminators", value=str(5))
+        ridpt_javascript = """
+                        var originalRIDPTData = structuredClone(source)
+                        var newNumber = Number(ridpt_number.value)
+                        ridpt_glyphs.data_source.data['x'] = originalRIDPTData['x'].slice(0, newNumber)
+                        ridpt_glyphs.data_source.data['y'] = originalRIDPTData['y'].slice(0, newNumber)
+                        ridpt_glyphs.data_source.data['position'] = originalRIDPTData['position'].slice(0, newNumber)
+                        ridpt_glyphs.data_source.data['score'] = originalRIDPTData['score'].slice(0, newNumber)
+                        ridpt_glyphs.data_source.data['strand'] = originalRIDPTData['strand'].slice(0, newNumber)
+                        ridpt_glyphs.data_source.change.emit()
+                        """
+        ridpt_javascript = CustomJS(args=dict(ridpt_glyphs=terminator_glyphs, ridpt_number=ridpt_number, source=terminator_dict), code=ridpt_javascript)
+        curdoc().js_on_event(DocumentReady, ridpt_javascript)
+        wigits.append((ridpt_number, ridpt_javascript))
 
     # Extra line below promoters and terminators
     fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
