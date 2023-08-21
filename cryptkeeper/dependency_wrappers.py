@@ -155,9 +155,9 @@ def _read_transterm_output(input_file_name):
             new_entry["start"] = int(split_line[4])
             new_entry["end"] = int(split_line[2])
 
-        new_entry["conf"] = split_line[7]
-        new_entry["hairpin_score"] = split_line[8]
-        new_entry["tail_score"] = split_line[9]
+        new_entry["conf"] = int(split_line[7])
+        new_entry["hairpin_score"] = int(split_line[8])
+        new_entry["tail_score"] = int(split_line[9])
 
     return entry_list
 

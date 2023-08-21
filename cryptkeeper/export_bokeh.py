@@ -1,6 +1,5 @@
 # Visualize the data on a bokah plot
-import math
-from bokeh.models import ColumnDataSource, Grid, LinearAxis, Plot, Rect
+from bokeh.models import ColumnDataSource, Grid, LinearAxis, Plot, Rect, TextInput, CustomJS
 from bokeh.io import curdoc, show
 import numpy as np
 from collections import namedtuple
@@ -8,6 +7,7 @@ import pandas as pd
 from bokeh.transform import linear_cmap, log_cmap
 from bokeh.palettes import Viridis256
 from bokeh.plotting import output_file, save
+from bokeh.layouts import column, row
 
 def plot_boxes(features_list):
 
@@ -30,8 +30,6 @@ def plot_boxes(features_list):
         expression = float(10 ** abs(feature.expression))
         if expression > highest_expression:
             highest_expression = expression
-
-
         to_add = 0
 
         failed = True
@@ -103,7 +101,7 @@ def plot_boxes(features_list):
     return bokah_orfs, highest_burden
 
 
-def export_bokah(cryptresult, filename=None):
+def export_bokeh(cryptresult, filename=None):
     # Set up plot
     from bokeh.plotting import figure, show
     from bokeh.models import ColumnDataSource, Range1d, LabelSet, Label
@@ -128,11 +126,17 @@ def export_bokah(cryptresult, filename=None):
     fig.xgrid.visible = False
     fig.toolbar.logo = None
 
+    wigits = []
+
+    fig.extra_y_ranges = {"y_range2": Range1d(start=-5000, end=15000),
+                          "y_range3": Range1d(start=0, end=0)}
+    fig.add_layout(LinearAxis(y_range_name="y_range3"), 'left')
+
     # Set size of the figure to the width of the browser
     fig.width = 1000
 
     # Draw a line for the sequence
-    fig.line([0, len(cryptresult.sequence)], [0, 0], line_width=2, color="black")
+    fig.line([0, len(cryptresult.sequence)], [0, 0], line_width=2, color="black", y_range_name="y_range2")
 
     # Add predefined features from the genbank file
     if cryptresult.annotations:
@@ -162,7 +166,7 @@ def export_bokah(cryptresult, filename=None):
             arrow_depth = 100
             if genbank_annotation.end-genbank_annotation.start < arrow_depth:
                     arrow_depth = genbank_annotation.end-genbank_annotation.start
-            annotation_base_y = -2000.*genbank_annotation.nest_level-1000
+            annotation_base_y = -1250.*genbank_annotation.nest_level-3000
             if genbank_annotation.strand == 1:
                 xs=[genbank_annotation.start, genbank_annotation.start, genbank_annotation.end-arrow_depth, genbank_annotation.end, genbank_annotation.end-arrow_depth]
                 ys=[annotation_base_y+500, annotation_base_y-500, annotation_base_y-500, annotation_base_y, annotation_base_y+500]
@@ -180,50 +184,143 @@ def export_bokah(cryptresult, filename=None):
             genbank_dictionary['color'].append(color)
             genbank_dictionary['name'].append(name)
 
-        genbank_glyphs = fig.patches('x', 'y', color='color', source=genbank_dictionary, alpha=0.5, line_color='black', line_width=1)
+        genbank_glyphs = fig.patches('x', 'y', color='color', source=genbank_dictionary, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
         genbank_glyphs_hover = HoverTool(renderers=[genbank_glyphs], tooltips=[("Name", "@name")])
         fig.add_tools(genbank_glyphs_hover)
 
-
-
-        source = ColumnDataSource(genbank_dictionary)
-
-        # Add mouseover text from feature name
-        #hover = HoverTool(tooltips=[("Name", "@name")])
-        #fig.add_tools(hover)
-
-        # Draw the features
-        #fig.rect(x="x", y="y", width="w", height="h", source=source, color="color", line_color="black", line_width=1)
-        
-
     # Add the expressed CDSs
     expressed_CDSs = cryptresult.translation_sites
+    if expressed_CDSs:
+        # Sort the expressed_CDS by the difference between the start and end
+        def sort_algorythm(x):
+            candidate_1 = x.end - x.start
+            candidate_2 = x.start - x.end
+            return max(candidate_1, candidate_2)
 
-    # Sort the expressed_CDS by the difference between the start and end
-    def sort_algorythm(x):
-        candidate_1 = x.end - x.start
-        candidate_2 = x.start - x.end
-        return max(candidate_1, candidate_2)
+
+        expressed_CDSs = sorted(expressed_CDSs, key=sort_algorythm, reverse=True)
+
+        boxes, highest_expression = plot_boxes(expressed_CDSs)
+        source = ColumnDataSource(boxes)
+
+        cmap = linear_cmap(field_name='burden', palette=Viridis256, low=0, high=highest_expression)
+        rectangles = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range3")
+        rectangles_hover = HoverTool(renderers=[rectangles], tooltips=[("Burden", "@burden"), ("Cumulative y", "@y")])
+        fig.add_tools(rectangles_hover)
+
+        color_bar = rectangles.construct_color_bar(padding=0,
+                                        ticker=fig.xaxis.ticker,
+                                        formatter=fig.xaxis.formatter)
+        fig.add_layout(color_bar, 'right')
+        highest_y = max([(x[0]+x[1]) for x in zip(boxes['y'], boxes['h'])])
+
+        max_y = TextInput(title="Max y", value=str(highest_y))
+        max_y_js = CustomJS(args=dict(plotRange1=fig.y_range, plotRange2=fig.extra_y_ranges["y_range3"]), code="""
+    var newEnd = Number(cb_obj.value)
+    plotRange2.start = newEnd * -1/3     
+    plotRange2.end = newEnd                        
+""")
+        wigits.append((max_y, max_y_js))
+
+        max_burden = TextInput(title="Max burden", value=str(highest_expression))
+        max_burden_js = CustomJS(args=dict(color_bar=color_bar), code="""
+    var newMax = Number(cb_obj.value)
+    color_bar.color_mapper.high = newMax
+""")
+        wigits.append((max_burden, max_burden_js))
+
+    # add promoters
+    promoters = cryptresult.promoters
+    if promoters:
+        promoters = sorted(promoters, key=lambda x: x.score, reverse=True)
+        promoter_dict = {'x': [],
+                     'y': [],
+                     'position': [],
+                     'score': []}
+        
+        for promoter in promoters[:10]:
+            arrow_shape = ((-10, 0), (10, 0), (10, 400), (50, 400), (50, 350), (100, 450), (50, 550), (50, 500), (-10, 500), (-10, 0))
+            if promoter.strand == "-":
+                arrow_shape = [(-x[0], -x[1]) for x in arrow_shape]
+            xs = [promoter.TSSpos + x[0] for x in arrow_shape]
+            ys = [x[1]-1000 for x in arrow_shape]
+            promoter_dict['x'].append(xs)
+            promoter_dict['y'].append(ys)
+            promoter_dict['position'].append(promoter.TSSpos)
+            promoter_dict['score'].append(promoter.score)
 
 
-    expressed_CDSs = sorted(expressed_CDSs, key=sort_algorythm, reverse=True)
+        promoter_glyphs = fig.patches('x', 'y', color='green', source=promoter_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        promoter_glyphs_hover = HoverTool(renderers=[promoter_glyphs], tooltips=[("Position", "@position"), ("Score", "@score")])
+        fig.add_tools(promoter_glyphs_hover)
 
-    boxes, highest_expression = plot_boxes(expressed_CDSs)
-    source = ColumnDataSource(boxes)
+    # Add the terminators
+    rdpt = cryptresult.rho_dep_terminators
+    ridpt = cryptresult.rho_ind_terminators
 
-    cmap = linear_cmap(field_name='burden', palette=Viridis256, low=0, high=highest_expression)
-    rectangles = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1)
-    rectangles_hover = HoverTool(renderers=[rectangles], tooltips=[("Burden", "@burden")])
-    fig.add_tools(rectangles_hover)
+    if rdpt:
+        rdpt = sorted(rdpt, key=lambda x: x.scores[0], reverse=True)
+        t_shape = ((-10, 0), (10, 0), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 0))
+        terminator_dict = {'x': [],
+                           'y': [],
+                           'position': [],
+                           'score': []}
+        # strand, start_rut, end_rut,  score
+        for terminator in rdpt[0:5]:
+            if terminator.strand == "-":
+                t_shape = [(-x[0], -x[1]) for x in t_shape]
+            xs = [terminator.start_rut + x[0] for x in t_shape]
+            ys = [x[1]-1000 for x in t_shape]
+            terminator_dict['x'].append(xs)
+            terminator_dict['y'].append(ys)
+            terminator_dict['position'].append(f'{terminator.start_rut}-{terminator.end_rut}')
+            terminator_dict['score'].append(terminator.scores[0])
 
-    color_bar = rectangles.construct_color_bar(padding=0,
-                                      ticker=fig.xaxis.ticker,
-                                      formatter=fig.xaxis.formatter)
-    fig.add_layout(color_bar, 'right')
+        terminator_glyphs = fig.patches('x', 'y', color='red', source=terminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ("Score", "@score")])
+        fig.add_tools(terminator_glyphs_hover)
+
+    if ridpt:
+        ridpt = sorted(ridpt, key=lambda x: x.conf, reverse=True)
+        t_shape = ((-10, 0), (10, 0), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 0))
+        terminator_dict = {'x': [],
+                            'y': [],
+                            'position': [],
+                            'score': []}
+        for terminator in ridpt[0:5]:
+            # strand, conf, start, end
+            if terminator.strand == "-":
+                t_shape = [(-x[0], -x[1]) for x in t_shape]
+            xs = [terminator.start + x[0] for x in t_shape]
+            ys = [x[1]-1000 for x in t_shape]
+            terminator_dict['x'].append(xs)
+            terminator_dict['y'].append(ys)
+            terminator_dict['position'].append(f'{terminator.start}-{terminator.end}')
+            terminator_dict['score'].append(terminator.conf)
+
+        terminator_glyphs = fig.patches('x', 'y', color='blue', source=terminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ("Score", "@score")])
+        fig.add_tools(terminator_glyphs_hover)
+
+    # Extra line below promoters and terminators
+    fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
+
+    # set y axis min and max of y_range3
+    fig.extra_y_ranges["y_range3"].start = -highest_y/3
+    fig.extra_y_ranges["y_range3"].end = highest_y
+
+    widgets_to_add = []
+    for wigit, js in wigits:
+        wigit.js_on_change('value', js)
+        widgets_to_add.append(wigit)
+
+    # Add the plot to the document and add a title
+    layout = column(fig, *widgets_to_add)
+    layout.sizing_mode = 'scale_width'
 
 
     # show the results
-    show(fig)
+    show(layout)
 
     if filename:
         output_file(filename=filename, title="Static HTML file")
