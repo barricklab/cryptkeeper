@@ -205,7 +205,7 @@ def export_bokeh(cryptresult, filename=None):
 
         cmap = linear_cmap(field_name='burden', palette=Viridis256, low=0, high=highest_expression)
         rectangles = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range3")
-        rectangles_hover = HoverTool(renderers=[rectangles], tooltips=[("Burden", "@burden"), ("Cumulative y", "@y")])
+        rectangles_hover = HoverTool(renderers=[rectangles], tooltips=[("Burden", "@burden")])
         fig.add_tools(rectangles_hover)
 
         color_bar = rectangles.construct_color_bar(padding=0,
