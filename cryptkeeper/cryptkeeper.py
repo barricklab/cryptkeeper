@@ -22,7 +22,7 @@ from rhotermpredict import rho_term_predict
 from .orf_predict import orf_predict, find_orfs
 from .dependency_wrappers import ostir, transterm, promocalc
 from .export import CryptResults, plot, to_csv, to_summary
-from .export_bokah import export_bokah
+from .export_bokeh import export_bokeh
 
 def main():
     """CLI Entry Point for Cryptkeeper"""
@@ -119,7 +119,7 @@ def main():
         DeprecationWarning('Matplotlib base plotting will be replaced with bokah soon')
         plot(result, options.o + "_graph.html")
     else:
-        export_bokah(result, options.o + "_graph.html")
+        export_bokeh(result, options.o + "_graph.html")
     print('Done')
     
 
@@ -485,24 +485,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
         transterm_predictions = list(filter(lambda x: (int(x.start) <= len(single_sequence)), transterm_predictions))
 
         rhotermpredict_results = list(filter(lambda x: (int(x.start_rut) <= len(single_sequence)), rhotermpredict_results))
-
-        '''
-        # Split reading frames and assign
-        added_split_orfs = []
-        for orf in orf_predictions:
-            orf['start'] = int(orf['start']) - circular_length
-            orf['end'] = int(orf['end']) - circular_length
-
-            if int(orf['end']) > circular_length:
-
-                new_split_orf = deepcopy(orf)
-                orf['end'] = circular_length
-                new_split_orf['start'] = "1"
-                new_split_orf['end'] = int(new_split_orf['end']) - circular_length
-
-                added_split_orfs.append(new_split_orf)
-        orf_predictions.extend(added_split_orfs)
-        '''
 
     # Set up the results object
     result = CryptResults(name = name,
