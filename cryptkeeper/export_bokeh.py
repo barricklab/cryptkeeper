@@ -248,7 +248,7 @@ def export_bokeh(cryptresult, filename=None):
                      'strand': []}
         
         for promoter in promoters:
-            arrow_shape = ((-10, 0), (10, 0), (10, 400), (50, 400), (50, 350), (100, 450), (50, 550), (50, 500), (-10, 500), (-10, 0))
+            arrow_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 350), (100, 450), (50, 550), (50, 500), (-10, 500), (-10, 50))
             if promoter.strand == "-":
                 arrow_shape = [(-x[0], -x[1]) for x in arrow_shape]
             xs = [promoter.TSSpos + x[0] for x in arrow_shape]
@@ -285,9 +285,11 @@ def export_bokeh(cryptresult, filename=None):
     rdpt = cryptresult.rho_dep_terminators
     ridpt = cryptresult.rho_ind_terminators
 
+    t_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 50))
+
     if rdpt:
         rdpt = sorted(rdpt, key=lambda x: x.scores[0], reverse=True)
-        t_shape = ((-10, 0), (10, 0), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 0))
+        
         terminator_dict = {'x': [],
                            'y': [],
                            'position': [],
@@ -328,7 +330,6 @@ def export_bokeh(cryptresult, filename=None):
 
     if ridpt:
         ridpt = sorted(ridpt, key=lambda x: x.conf, reverse=True)
-        t_shape = ((-10, 0), (10, 0), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 0))
         terminator_dict = {'x': [],
                             'y': [],
                             'position': [],
@@ -351,7 +352,7 @@ def export_bokeh(cryptresult, filename=None):
         fig.add_tools(terminator_glyphs_hover)
 
         # Add a widget to change the number of terminators shown
-        ridpt_number = TextInput(title="Number of Rho-Inependant Terminators", value=str(5))
+        ridpt_number = TextInput(title="Number of Rho-Independant Terminators", value=str(5))
         ridpt_javascript = """
                         var originalRIDPTData = structuredClone(source)
                         var newNumber = Number(ridpt_number.value)
