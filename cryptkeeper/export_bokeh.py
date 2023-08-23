@@ -1,15 +1,19 @@
 # Visualize the data on a bokah plot
-from bokeh.models import ColumnDataSource, Grid, LinearAxis, Plot, Rect, TextInput, CustomJS
-from bokeh.io import curdoc, show
 import numpy as np
-from collections import namedtuple
+import os
 import pandas as pd
-from bokeh.transform import linear_cmap, log_cmap
+import bokeh
+from bokeh.transform import linear_cmap
 from bokeh.palettes import Viridis256
 from bokeh.plotting import output_file, save
 from bokeh.layouts import column, row
 from bokeh.events import DocumentReady
 from bokeh.io import curdoc
+from bokeh.plotting import figure, show
+from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div
+from bokeh.embed import components
+
+from bokeh.models.widgets import DataTable, TableColumn
 
 def plot_boxes(features_list):
 
@@ -107,37 +111,23 @@ def plot_boxes(features_list):
 
 def export_bokeh(cryptresult, filename=None):
     # Set up plot
-    from bokeh.plotting import figure, show
-    from bokeh.models import ColumnDataSource, Range1d, LabelSet, Label
-    from bokeh.models import Arrow, OpenHead, NormalHead, VeeHead
-    from bokeh.models import BoxAnnotation
-    from bokeh.models import HoverTool
-    from bokeh.models import Legend
-    from bokeh.models import Span
-    from bokeh.models import Arrow, OpenHead, NormalHead, VeeHead
-    from bokeh.models import BoxAnnotation
-    from bokeh.models import HoverTool
-    from bokeh.models import Legend
-    from bokeh.models import Span
-    from bokeh.models import PolyAnnotation
 
     # Set up the figure
-    fig = figure()
+    fig = figure(width=1500, height=750,)
     fig.xaxis.axis_label = "Position"
-    fig.yaxis.axis_label = "Strand"
+    fig.yaxis.axis_label = "Expression"
     fig.yaxis.visible = False
     fig.ygrid.visible = False
     fig.xgrid.visible = False
     fig.toolbar.logo = None
 
+
     wigits = []
+    tables = {}
 
     fig.extra_y_ranges = {"y_range2": Range1d(start=-5000, end=15000),
                           "y_range3": Range1d(start=0, end=0)}
-    fig.add_layout(LinearAxis(y_range_name="y_range3"), 'left')
-
-    # Set size of the figure to the width of the browser
-    fig.width = 1000
+    fig.add_layout(LinearAxis(y_range_name="y_range3", axis_label="Expression"), 'left')
 
     # Draw a line for the sequence
     fig.line([0, len(cryptresult.sequence)], [0, 0], line_width=2, color="black", y_range_name="y_range2")
@@ -198,6 +188,7 @@ def export_bokeh(cryptresult, filename=None):
 
     # Add the expressed CDSs
     expressed_CDSs = cryptresult.translation_sites
+    color_bar_figure = None
     if expressed_CDSs:
         # Sort the expressed_CDS by the difference between the start and end
         def sort_algorythm(x):
@@ -219,7 +210,9 @@ def export_bokeh(cryptresult, filename=None):
         color_bar = rectangles.construct_color_bar(padding=0,
                                         ticker=fig.xaxis.ticker,
                                         formatter=fig.xaxis.formatter)
-        fig.add_layout(color_bar, 'right')
+        color_bar_figure = figure(title="Burden", title_location="right", width=100, height=750, y_range=(0, highest_expression), toolbar_location=None, min_border=0, outline_line_color=None)
+        color_bar_figure.add_layout(color_bar, 'right')
+        color_bar_figure.title.align = "center"
         highest_y = max([(x[0]+x[1]) for x in zip(boxes['y'], boxes['h'])])
 
         max_y = TextInput(title="Max y", value=str(highest_y))
@@ -236,6 +229,12 @@ def export_bokeh(cryptresult, filename=None):
     color_bar.color_mapper.high = newMax
 """)
         wigits.append((max_burden, max_burden_js))
+
+        # Add table
+        expressed_CDSs = sorted(expressed_CDSs, key=lambda x: x.burden, reverse=True)
+        name = 'Expressed CDSs'
+        expressed_CDSs_table = generate_bokeh_table(expressed_CDSs, name)
+        tables[name] = expressed_CDSs_table
 
     # add promoters
     promoters = cryptresult.promoters
@@ -279,6 +278,11 @@ def export_bokeh(cryptresult, filename=None):
         promoter_javascript = CustomJS(args=dict(promoter_glyphs=promoter_glyphs, promoter_number=promoter_number, source=promoter_dict), code=promoter_javascript)
         curdoc().js_on_event(DocumentReady, promoter_javascript)
         wigits.append((promoter_number, promoter_javascript))
+
+        # Add table
+        name = 'Promoters'
+        promoter_table = generate_bokeh_table(promoters, name)
+        tables[name] = promoter_table
 
 
     # Add the terminators
@@ -327,6 +331,12 @@ def export_bokeh(cryptresult, filename=None):
         curdoc().js_on_event(DocumentReady, rdpt_javascript)
         wigits.append((rdpt_number, rdpt_javascript))
 
+        # Add table
+        name = 'Rho-Dependant Terminators'
+        rdpt_table = generate_bokeh_table(rdpt, name)
+        tables[name] = rdpt_table
+
+
 
     if ridpt:
         ridpt = sorted(ridpt, key=lambda x: x.conf, reverse=True)
@@ -367,6 +377,11 @@ def export_bokeh(cryptresult, filename=None):
         curdoc().js_on_event(DocumentReady, ridpt_javascript)
         wigits.append((ridpt_number, ridpt_javascript))
 
+        # Add table
+        name = 'Rho-Independant Terminators'
+        ridpt_table = generate_bokeh_table(ridpt, name)
+        tables[name] = ridpt_table
+
     # Extra line below promoters and terminators
     fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
 
@@ -380,19 +395,78 @@ def export_bokeh(cryptresult, filename=None):
         widgets_to_add.append(wigit)
 
     # Add the plot to the document and add a title
-    layout = column(fig, *widgets_to_add)
+    widgets = row(*widgets_to_add, styles={'margin': '0 auto', 'align-items': 'center'})
+    if color_bar_figure:
+        layout = row(fig, color_bar_figure)
+    else:
+        layout = fig
+    layout = column(layout, widgets, styles={'margin': '0 auto', 'align-items': 'center'})
     layout.sizing_mode = 'scale_width'
 
-
-    # show the results
-    show(layout)
+    # Add the tables
+    if tables:
+        if len(tables) > 1:
+            # Make buttons that show the appropriat tables
+            buttons = []
+            button_label = Div(text="Tables:")
+            for table_name in tables:
+                button = bokeh.models.widgets.Button(label=table_name)
+                button.js_on_click(CustomJS(args=dict(tables=tables, label=table_name), code="""
+                tables[label].visible = true;
+                for (var key in tables) {
+                    if (key != label){
+                        tables[key].visible = false;
+                    }
+                }
+                """))
+                buttons.append(button)
+                tables[table_name].visible = False
+            buttons = row(button_label, *buttons, styles={'margin': '0 auto', 'align-items': 'center'})
+            layout = column(layout, buttons, styles={'margin': '0 auto', 'align-items': 'center'})
+            layout = column(layout, *tables.values(), styles={'margin': '0 auto', 'align-items': 'center'})
+        else:
+            layout = column(layout, *tables, styles={'margin': '0 auto', 'align-items': 'center'})
 
     if filename:
-        output_file(filename=filename, title="Static HTML file")
-        save(fig)
-
+        script, fig = components(layout)
+        export_html(script, fig, filename)
+        # copy the assets folder to the output folder if it doesn't exist
+        import shutil
+        if os.path.exists(os.path.join(os.path.dirname(filename), "assets")):
+            shutil.rmtree(os.path.join(os.path.dirname(filename), "assets"))
+        shutil.copytree(os.path.join(os.path.dirname(__file__), "assets"), os.path.join(os.path.dirname(filename), "assets"))
+        return filename
 
     return fig
+
+def generate_bokeh_table(list, name) -> DataTable:
+    # Generate a bokeh table from a list of named tuples
+    column_names = list[0]._fields
+    table_name = list[0].__class__.__name__
+    data = {column_name: [] for column_name in column_names}
+    for row in list:
+        for column_name in column_names:
+            data[column_name].append(getattr(row, column_name))
+    source = ColumnDataSource(data)
+    columns = [TableColumn(field=column_name, title=column_name) for column_name in column_names]
+    name_div = Div(text=f"<h1>{name}</h1>")
+    table = DataTable(source=source, columns=columns, name=table_name, width=1500, editable=True)
+    table = column(name_div, table)
+    return table
+
+def export_html(script, div, filename):
+    bokeh_version = bokeh.__version__
+    template_path = os.path.join(os.path.dirname(__file__), "assets", "html_template.html")
+    asset_location = os.path.join(os.path.dirname(__file__), "assets")
+    with open(template_path, "r") as f:
+        template = f.read()
+    template = template.replace("{{bokehscript}}", script)
+    template = template.replace("{{bokehdiv}}", div)
+    template = template.replace("{{bokehversion}}", bokeh_version)
+    template = template.replace("{{assetlocation}}", asset_location)
+    with open(filename, "w") as f:
+        f.write(template)
+    return filename
 
 
 # EOF

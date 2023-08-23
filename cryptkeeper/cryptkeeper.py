@@ -23,6 +23,7 @@ from .orf_predict import orf_predict, find_orfs
 from .dependency_wrappers import ostir, transterm, promocalc
 from .export import CryptResults, plot, to_csv, to_summary
 from .export_bokeh import export_bokeh
+import webbrowser
 
 def main():
     """CLI Entry Point for Cryptkeeper"""
@@ -102,6 +103,8 @@ def main():
     #    )
 
     # ------------------------------------------------------------------------------
+
+
     options = parser.parse_args()
 
     result = cryptkeeper(input_file = options.i,
@@ -119,7 +122,8 @@ def main():
         DeprecationWarning('Matplotlib base plotting will be replaced with bokah soon')
         plot(result, options.o + "_graph.html")
     else:
-        export_bokeh(result, options.o + "_graph.html")
+        plot_filepath = export_bokeh(result, options.o + "_graph.html")
+        webbrowser.open(plot_filepath)
     print('Done')
     
 

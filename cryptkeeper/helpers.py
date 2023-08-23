@@ -4,10 +4,11 @@ import shelve
 import os
 import inspect
 import hashlib
+import math
 from functools import wraps
 from pathlib import Path
 
-def timer(func):
+def timer(func) -> callable:
     """ A timer decorator """
     def wrapper(*args, **kwargs):
         start = time()
@@ -33,3 +34,5 @@ def persistant_cache(filepath=None):
                 return cache[key]
         return wrapper
     return decorator
+
+#EOF

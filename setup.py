@@ -26,7 +26,8 @@ setup(
         'console_scripts' : [
           'cryptkeeper = cryptkeeper.cryptkeeper:main',
         ],
-    }
+    },
+    include_package_data=True,
 
     # could also include long_description, download_url, etc.
 )
