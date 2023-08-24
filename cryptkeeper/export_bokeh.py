@@ -292,7 +292,7 @@ def export_bokeh(cryptresult, filename=None):
     t_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 50))
 
     if rdpt:
-        rdpt = sorted(rdpt, key=lambda x: x.scores[0], reverse=True)
+        rdpt = sorted(rdpt, key=lambda x: x.score, reverse=True)
         
         terminator_dict = {'x': [],
                            'y': [],
@@ -308,7 +308,7 @@ def export_bokeh(cryptresult, filename=None):
             terminator_dict['x'].append(xs)
             terminator_dict['y'].append(ys)
             terminator_dict['position'].append(f'{terminator.start_rut}-{terminator.end_rut}')
-            terminator_dict['score'].append(terminator.scores[0])
+            terminator_dict['score'].append(terminator.score)
             terminator_dict['strand'].append(terminator.strand)
 
         terminator_glyphs = fig.patches('x', 'y', color='red', source=terminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")

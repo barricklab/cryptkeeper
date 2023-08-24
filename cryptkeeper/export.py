@@ -112,7 +112,7 @@ def plot(results: CryptResults, output_path: str):
 
     rdt_rhotermpredict_series = go.Scatter(
       x = [int(e.end_rut) for e in rhotermpredict_predictions],
-      y = [int(sum(e.scores)) for e in rhotermpredict_predictions],
+      y = [int(e.score) for e in rhotermpredict_predictions],
       mode = 'markers',
       name = 'RDT',
       yaxis='y6',
@@ -125,7 +125,7 @@ def plot(results: CryptResults, output_path: str):
       error_y=dict(
               type='data',
               array=[0],
-              arrayminus=[sum(e.scores) for e in rhotermpredict_predictions],
+              arrayminus=[e.score for e in rhotermpredict_predictions],
               width=0,
               color=RIT_color,
           )

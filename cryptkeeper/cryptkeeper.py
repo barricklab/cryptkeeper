@@ -359,7 +359,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                                         downstream_seq,
                                         palindromes,
                                         pause_concensus,
-                                        scores""")
+                                        score""")
     rhotermpredict_results = []
     for result in rhotermpredict_predictions:
         rhotermpredict_results.append(rdtresult(result.strand,
@@ -370,7 +370,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                                                 result.downstream_seq,
                                                 result.palindromes,
                                                 result.pause_concensus,
-                                                result.scores))
+                                                result.score))
 
 
     logger.info('Running RIT_predict_TransTerm')
