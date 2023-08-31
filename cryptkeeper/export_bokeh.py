@@ -242,7 +242,6 @@ def export_bokeh(cryptresult, filename=None):
 
     # add promoters
     promoters = cryptresult.promoters
-    '''
     if promoters:
         promoters = sorted(promoters, key=lambda x: x.score, reverse=True)
         promoter_dict = {'x': [],
@@ -288,7 +287,6 @@ def export_bokeh(cryptresult, filename=None):
         name = 'Promoters'
         promoter_table = generate_bokeh_table(promoters, name)
         tables[name] = promoter_table
-    '''
 
 
     # Add the terminators
@@ -342,7 +340,6 @@ def export_bokeh(cryptresult, filename=None):
         tables[name] = rdpt_table
 
 
-    '''
     if ridpt:
         ridpt = sorted(ridpt, key=lambda x: x.conf, reverse=True)
         terminator_dict = {'x': [],
@@ -386,7 +383,7 @@ def export_bokeh(cryptresult, filename=None):
         # Add table
         name = 'Rho-Independant Terminators'
         ridpt_table = generate_bokeh_table(ridpt, name)
-        tables[name] = ridpt_table'''
+        tables[name] = ridpt_table
 
     # Extra line below promoters and terminators
     fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
