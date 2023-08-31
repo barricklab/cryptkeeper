@@ -129,6 +129,10 @@ def export_bokeh(cryptresult, filename=None):
                           "y_range3": Range1d(start=0, end=0)}
     fig.add_layout(LinearAxis(y_range_name="y_range3", axis_label="Expression"), 'left')
 
+    # set width to length of sequence
+    fig.x_range = Range1d(start=0, end=len(cryptresult.sequence))
+
+
     # Draw a line for the sequence
     fig.line([0, len(cryptresult.sequence)], [0, 0], line_width=2, color="black", y_range_name="y_range2")
 
@@ -238,6 +242,7 @@ def export_bokeh(cryptresult, filename=None):
 
     # add promoters
     promoters = cryptresult.promoters
+    '''
     if promoters:
         promoters = sorted(promoters, key=lambda x: x.score, reverse=True)
         promoter_dict = {'x': [],
@@ -283,35 +288,35 @@ def export_bokeh(cryptresult, filename=None):
         name = 'Promoters'
         promoter_table = generate_bokeh_table(promoters, name)
         tables[name] = promoter_table
+    '''
 
 
     # Add the terminators
     rdpt = cryptresult.rho_dep_terminators
     ridpt = cryptresult.rho_ind_terminators
 
-    t_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 50))
-
     if rdpt:
         rdpt = sorted(rdpt, key=lambda x: x.score, reverse=True)
         
-        terminator_dict = {'x': [],
+        ritterminator_dict = {'x': [],
                            'y': [],
                            'position': [],
                            'score': [],
                            'strand': []}
         # strand, start_rut, end_rut,  score
         for terminator in rdpt:
+            t_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 50))
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
             xs = [terminator.start_rut + x[0] for x in t_shape]
             ys = [x[1]-1000 for x in t_shape]
-            terminator_dict['x'].append(xs)
-            terminator_dict['y'].append(ys)
-            terminator_dict['position'].append(f'{terminator.start_rut}-{terminator.end_rut}')
-            terminator_dict['score'].append(terminator.score)
-            terminator_dict['strand'].append(terminator.strand)
+            ritterminator_dict['x'].append(xs)
+            ritterminator_dict['y'].append(ys)
+            ritterminator_dict['position'].append(f'{terminator.start_rut}-{terminator.end_rut}')
+            ritterminator_dict['score'].append(terminator.score)
+            ritterminator_dict['strand'].append(terminator.strand)
 
-        terminator_glyphs = fig.patches('x', 'y', color='red', source=terminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        terminator_glyphs = fig.patches('x', 'y', color='red', source=ritterminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
         terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ('Strand', '@strand'), ("Score", "@score")])
         fig.add_tools(terminator_glyphs_hover)
 
@@ -327,7 +332,7 @@ def export_bokeh(cryptresult, filename=None):
                         rdpt_glyphs.data_source.data['strand'] = originalRDPTData['strand'].slice(0, newNumber)
                         rdpt_glyphs.data_source.change.emit()
                         """
-        rdpt_javascript = CustomJS(args=dict(rdpt_glyphs=terminator_glyphs, rdpt_number=rdpt_number, source=terminator_dict), code=rdpt_javascript)
+        rdpt_javascript = CustomJS(args=dict(rdpt_glyphs=terminator_glyphs, rdpt_number=rdpt_number, source=ritterminator_dict), code=rdpt_javascript)
         curdoc().js_on_event(DocumentReady, rdpt_javascript)
         wigits.append((rdpt_number, rdpt_javascript))
 
@@ -337,7 +342,7 @@ def export_bokeh(cryptresult, filename=None):
         tables[name] = rdpt_table
 
 
-
+    '''
     if ridpt:
         ridpt = sorted(ridpt, key=lambda x: x.conf, reverse=True)
         terminator_dict = {'x': [],
@@ -346,6 +351,7 @@ def export_bokeh(cryptresult, filename=None):
                             'score': [],
                             'strand': []}
         for terminator in ridpt:
+            t_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 50))
             # strand, conf, start, end
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
@@ -380,7 +386,7 @@ def export_bokeh(cryptresult, filename=None):
         # Add table
         name = 'Rho-Independant Terminators'
         ridpt_table = generate_bokeh_table(ridpt, name)
-        tables[name] = ridpt_table
+        tables[name] = ridpt_table'''
 
     # Extra line below promoters and terminators
     fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
