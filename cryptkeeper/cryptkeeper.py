@@ -183,7 +183,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
     # Convert non-FASTA files to FASTA (supports Genbank) - This is necessary to run TransTermHP
     if input_file_type != "fasta" and input_file_type != "fna":
         logger.info("Non-FASTA file detected. Converting.")
-        if input_file_type in ['genbank', 'gb', 'gbk']:
+        if input_file_type in ['genbank', 'gb', 'gbk', 'gbff']:
             with open(input_file_name, "r", encoding="utf-8" ) as file_in:
                 with open(f"{output_path + '.' + input_gene_name}.fna", "w", encoding="utf-8") as file_converted:
                     sequences = SeqIO.parse(file_in, "genbank")
@@ -289,7 +289,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
    # Extract annotation information from genbank files
     feature_tuple = namedtuple('feature', ['name', 'strand', 'start', 'end', 'color', 'nest_level'])
     features_list = []
-    if input_file_type in ['genbank', 'gb', 'gbk']:
+    if input_file_type in ['genbank', 'gb', 'gbk', 'gbff']:
 
         features = [feature for feature in [rec for rec in SeqIO.parse(input_sequence, "genbank")][0].features]
         for feature in features:
