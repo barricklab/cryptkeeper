@@ -21,34 +21,41 @@ room_for_annotations = 25  # In percent of the graph
 
 
 def plot_boxes(features_list):
-
+    """
+    Generate the plot of boxes for a list of features.
+    Parameters:
+        features_list (list): A list of features, typically the expressed ORFs.
+    Returns:
+        tuple: A tuple containing the dictionary of bokah ORFs with their coordinates and attributes, and the highest burden value.
+    """
     placed_ORFs = pd.DataFrame(columns=["start_x", "stop_x", "start_y", "stop_y", "burden", "strand", "expression"])
     highest_expression = 0
     highest_burden = 0
 
     for feature in features_list:
-        start_x_adding = int(feature.start)
-        stop_x_adding = int(feature.end)
+        start_x = int(feature.start)
+        stop_x = int(feature.end)
         burden = float(feature.burden)
         strand = feature.strand
         expression = feature.expression
+
         if burden > highest_burden:
             highest_burden = burden
 
-        
-        if start_x_adding > stop_x_adding:  # Then the ORF is reverse stranded
-            start_x_adding, stop_x_adding = stop_x_adding, start_x_adding
-            # Now the variables are switched
-        
-        expression = float(10 ** abs(feature.expression))  # @TODO: I think this is wrong. 
+        if start_x > stop_x:  # Reverse stranded ORF
+            start_x, stop_x = stop_x, start_x
+
+        #expression = float(10 ** abs(expression))  # Calculate expression
         if expression > highest_expression:
             highest_expression = expression
-        to_add = 0
 
+        to_add = 0
         failed = True
+
         while failed:
-            start_y_adding = to_add
-            stop_y_adding = to_add + expression  # Subtracts if reverse strand
+            start_y = to_add
+            stop_y = to_add + expression
+
             about_to_break = False
 
             for j in range(placed_ORFs.shape[0]):
@@ -57,42 +64,34 @@ def plot_boxes(features_list):
                 start_y_checking = float(placed_ORFs.loc[j, "start_y"])
                 stop_y_checking = float(placed_ORFs.loc[j, "stop_y"])
 
-                if start_x_adding >= stop_x_checking:
+                if start_x >= stop_x_checking or stop_x <= start_x_checking:
                     continue
-                if stop_x_adding <= start_x_checking:
-                    continue
-                
+
                 if np.sign(expression) != np.sign(stop_y_checking):
                     continue
-                
+
                 if np.sign(expression) == 1:
-                    if start_y_adding >= stop_y_checking:
-                        continue
-                    if stop_y_adding <= start_y_checking:
+                    if start_y >= stop_y_checking or stop_y <= start_y_checking:
                         continue
                     to_add = stop_y_checking
                     about_to_break = True
                     break
-                
+
                 if np.sign(expression) == -1:
-                    if start_y_adding <= stop_y_checking:
-                        continue
-                    if stop_y_adding >= start_y_checking:
+                    if start_y <= stop_y_checking or stop_y >= start_y_checking:
                         continue
                     to_add = stop_y_checking
                     about_to_break = True
                     break
-                
+
                 about_to_break = True
                 break
-            
+
             if not about_to_break:
                 failed = False
-        
-        placed_ORFs.loc[placed_ORFs.shape[0]] = [start_x_adding, stop_x_adding, start_y_adding, stop_y_adding, burden, strand, expression]
 
+        placed_ORFs.loc[placed_ORFs.shape[0]] = [start_x, stop_x, start_y, stop_y, burden, strand, expression]
 
-    # Convert to somethong bokah understands
     bokah_orfs = {
         "x": [],
         "y": [],
@@ -254,7 +253,6 @@ def export_bokeh(cryptresult, filename=None):
         reverse_height = lowest_annotation_y-500
         fig.line([0, len(cryptresult.sequence)], [reverse_height-1000, reverse_height-1000], line_width=2, color="black", y_range_name="y_range2")
         annotation_depth = reverse_height-1000
-    print(f'Lowest annotation y = {lowest_annotation_y} | View format = {view_format} | Reverse exists = {reverse_exists}')
 
     # add promoters
     promoters = cryptresult.promoters

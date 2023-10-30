@@ -110,8 +110,6 @@ def main() -> None:
     result.to_json(options.o + "_results.json")
 
     # Print a message indicating that the analysis is finished
-    print('Finished analysis. Plotting.')
-
     # Plot the result using the selected visualization method
     if options.matplotlib:
         DeprecationWarning('Matplotlib base plotting will be replaced with bokah soon')
@@ -121,12 +119,10 @@ def main() -> None:
         webbrowser.open(plot_filepath)
 
     # Print a message indicating that the process is done
-    print('Done')
 
 
 def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, rbs_score_cutoff=2.0):
     """Predict cryptic bacterial gene expression signals in an input sequence."""
-    print(f'circular {circular=}')
 
     # @TODO: Many of these steps should be moved to a function
 
@@ -273,7 +269,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
             circular_length = 1000
         else:
             circular_length += 3
-        print(f'{circular_length = }')
 
         output_circular_fasta_file_name = output_path + '.extended.fasta' 
         with open(output_circular_fasta_file_name, "w", encoding="utf-8" ) as output_handle:
@@ -412,7 +407,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                                         score""")
     rhotermpredict_results = []
     for result in rhotermpredict_predictions:
-        print(result)
         rhotermpredict_results.append(rdtresult(result.strand,
                                                 result.c_over_g,
                                                 result.start_rut-circular_length,
@@ -489,7 +483,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
         orf_length = abs(orf_info['end'] - orf_info['start']) + 1
         if orf['start']+offset in expressed_starts.keys():
             rbs_info = rbs_predictions[expressed_starts[orf['start']+offset]]
-            rbs_score = np.log10(rbs_info.score)
+            rbs_score = rbs_info.score
             if str(rbs_score) in ['inf', '-inf']:
                 continue
 
@@ -499,7 +493,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
             processed_orf = expressed_orf(int(orf_info['start'])-circular_length,
                                             int(orf_info['end'])-circular_length,
                                             rbs_score,  # Log Version
-                                            orf_length * rbs_info.score,  # Non log version
+                                            orf_length * rbs_info.score,  # Burden
                                             rbs_info.score2,
                                             array,
                                             rbs_info.start_codon,
@@ -512,7 +506,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
     #   When available, assign RBS info to orf
             orf['array'] = orf_array
             orf['array_minus'] = array_minus
-            orf['rbs_score'] = 10**rbs_score
+            orf['rbs_score'] = rbs_score
 
         else:
             rbs_score = 0
@@ -548,11 +542,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                           promoters =  promoter_calc_predictions,
                           annotations = features_list,
                           burden = total_burden)
-
-    print(f"Found promoters: {len(promoter_calc_predictions)}")
-    print(f"Found rho-independent terminators: {len(transterm_predictions)}")
-    print(f"Found rho-dependent terminators: {len(rhotermpredict_results)}")
-    print(f"Found expressed ORFs: {len(expressed_orfs)}")
     return result
 
 
