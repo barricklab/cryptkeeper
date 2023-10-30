@@ -55,7 +55,7 @@ def ostir(inseq, threads=1):
 
     return processed_data
 
-def transterm(infile):
+def transterm(infile, circular_length):
     with tempfile.TemporaryDirectory() as temp_dir:
         i=0
         for this_seq in SeqIO.parse(infile, "fasta"):
@@ -102,6 +102,8 @@ def transterm(infile):
         transtermhits = namedtuple("transterm_result", "start end strand conf hairpin_score tail_score seq_upstream seq_hairpin_open seq_hairpin_loop seq_hairpin_close seq_tail")
         predictions = []
         for entry in final_list:
+            entry['start'] -= circular_length
+            entry['end'] -= circular_length
             predictions.append(transtermhits(**entry))
 
     return predictions
@@ -161,7 +163,7 @@ def _read_transterm_output(input_file_name):
 
     return entry_list
 
-def promocalc(inseq, threads=1):
+def promocalc(inseq, circular_length, threads=1):
 
     """ Runs the promoter-calculator on the input, returns results and writes them to the outfile """
     # Extract the sequence from the input
@@ -179,7 +181,7 @@ def promocalc(inseq, threads=1):
         result = outdata(result.promoter_sequence,
                          result.Tx_rate, 
                          result.strand,
-                         result.TSS,
+                         result.TSS-circular_length,
                          result.hex35_position,
                          result.hex35,
                          result.hex10_position,

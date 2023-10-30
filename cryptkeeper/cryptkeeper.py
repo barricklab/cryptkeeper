@@ -23,12 +23,17 @@ from .orf_predict import orf_predict, find_orfs
 from .dependency_wrappers import ostir, transterm, promocalc
 from .export import CryptResults, plot, to_csv, to_summary
 from .export_bokeh import export_bokeh
+from .constants import COLORS
+from .helpers import delay_iterator
 import webbrowser
 
-def main():
+def main() -> None:
     """CLI Entry Point for Cryptkeeper"""
-    # ------------------------------------------------------------------------------
+
+    # Create the argument parser
     parser = argparse.ArgumentParser(description='input fasta')
+
+    # Define the command line arguments
     parser.add_argument(
         '-i', '--input',
         action='store',
@@ -37,14 +42,12 @@ def main():
         type=str,
         help="input fasta file",
     )
-
     parser.add_argument(
         '-c', '--circular',
         action='store_true',
         dest='circular',
         help="The input file is circular. (Note: Increases runtime by 3x)",
     )
-
     parser.add_argument(
         '-o', '--output',
         action='store',
@@ -53,7 +56,6 @@ def main():
         type=str,
         help="output file prefix",
     )
-
     parser.add_argument(
         '-j', '-threads',
         action='store',
@@ -63,21 +65,18 @@ def main():
         help="Number of threads/processes to use",
         default=1
     )
-
     parser.add_argument(
         '-p', '--plot-only',
         action='store_true',
         dest='plot_only',
         help="plot mode, assumes output files all exist",
     )
-
     parser.add_argument(
         '-n', '--name',
         action='store',
         dest='name',
         help="name of sample (if not provided the filename is used)",
     )
-
     parser.add_argument(
         '--rbs-score-cutoff',
         action='store',
@@ -86,49 +85,48 @@ def main():
         type=float,
         help="Minimum score that is graphed and output to final files (all are used in calculating burden)",
     )
-
     parser.add_argument(
         '--matplotlib',
         action='store_true',
         dest='matplotlib',
         default=False,
-        help="Use MatPlotLib visualization (depricated)",
+        help="Use MatPlotLib visualization (deprecated)",
     )
 
-    # parser.add_argument(
-    #    '--pdf',
-    #    action='store_true',
-    #    dest='pdf',
-    #    help="write output plot as *.pdf",
-    #    )
-
-    # ------------------------------------------------------------------------------
-
-
+    # Parse the command line arguments
     options = parser.parse_args()
 
-    result = cryptkeeper(input_file = options.i,
+    # Call the cryptkeeper function with the provided options
+    result = cryptkeeper(input_file=options.i,
                         output=options.o,
                         circular=options.circular,
                         name=options.name,
                         threads=options.j,
                         rbs_score_cutoff=options.rbs_score_cutoff)
-    
+
+    # Perform additional operations on the result
     to_csv(result, options.o)
     to_summary(result, options.o + "_summary.txt")
     result.to_json(options.o + "_results.json")
+
+    # Print a message indicating that the analysis is finished
     print('Finished analysis. Plotting.')
+
+    # Plot the result using the selected visualization method
     if options.matplotlib:
         DeprecationWarning('Matplotlib base plotting will be replaced with bokah soon')
         plot(result, options.o + "_graph.html")
     else:
         plot_filepath = export_bokeh(result, options.o + "_graph.html")
         webbrowser.open(plot_filepath)
+
+    # Print a message indicating that the process is done
     print('Done')
-    
+
 
 def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, rbs_score_cutoff=2.0):
     """Predict cryptic bacterial gene expression signals in an input sequence."""
+    print(f'circular {circular=}')
 
     # @TODO: Many of these steps should be moved to a function
 
@@ -204,10 +202,10 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
     if len(sequences) > 1:
         logger.warning("Input file contains multiple sequences. Only the first will be processed.")
 
-    
+
     sequence_length = len(sequences[0])
 
-
+    circular_length = 0
     if circular:
         # If the input sequence is less than 200 bases, use the entire sequence
         # if the largest overlapping ORF is greater than 200 bases, use that
@@ -272,40 +270,91 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                 circular_length = overlapping_ORF
 
         if circular_length < 197:
-            circular_length = 200
+            circular_length = 1000
         else:
             circular_length += 3
+        print(f'{circular_length = }')
 
-        output_circular_fasta_file_name = output_path + '.extended.fasta'
+        output_circular_fasta_file_name = output_path + '.extended.fasta' 
         with open(output_circular_fasta_file_name, "w", encoding="utf-8" ) as output_handle:
-            sequences[0].seq = sequences[0].seq + sequences[0].seq[:circular_length]
+            sequences[0].seq = sequences[0].seq[-circular_length:] + sequences[0].seq + sequences[0].seq[:circular_length]
             SeqIO.write([sequences[0]], output_handle, "fasta")
             input_file_name = output_circular_fasta_file_name
 
 
-
-
-
    # Extract annotation information from genbank files
-    feature_tuple = namedtuple('feature', ['name', 'strand', 'start', 'end', 'color', 'nest_level'])
+    feature_tuple = namedtuple('feature', ['name', 'strand', 'start', 'end', 'color', 'nest_level', 'type'])
     features_list = []
     if input_file_type in ['genbank', 'gb', 'gbk', 'gbff']:
 
         features = [feature for feature in [rec for rec in SeqIO.parse(input_sequence, "genbank")][0].features]
-        for feature in features:
+        
+        delayable_features = delay_iterator(features)  # Works like appending to a list you're looping through, but lets you know when you're getting delayed objects
+        for feature, is_delayed in delayable_features:
+            # Make note of the feature type
+            feature_type = feature.type.lower()
+
+            # Save ORFs for last
+            translation_names = ['cds', 'translation', 'orf']
+            if feature_type in translation_names and not is_delayed:
+                delayable_features.delay(feature)
+                continue
+
+            # If the color is defined in the genbank file, use it
             if 'ApEinfo_revcolor' in feature.qualifiers:
                 color = feature.qualifiers['ApEinfo_revcolor'][0]
+            elif 'ApEinfo_fwdcolor' in feature.qualifiers:
+                color = feature.qualifiers['ApEinfo_fwdcolor'][0]
+
+            # Otherwise, we assign color based on the feature type
+            elif feature_type in ["gene"]:
+                color = COLORS['cds']
+            elif feature_type in ['promoter']:
+                color = COLORS['promoter']
+            elif feature_type in ['terminator']:
+                color = COLORS['terminator']
+            elif feature_type in ['ori', 'rep_origin']:
+                color = COLORS['ori']
+            elif feature_type in ['ncRNA']:
+                color = COLORS['ncrna']
+            elif feature_type in ['primer_bind']:
+                color = COLORS['primer_bind']
+            elif feature_type in translation_names:
+                color = COLORS['cds']
             else:
-                color = "black"
-            if not feature.qualifiers.get('label'): # Some features have no label (ex. transcripts from Benchling)
-                            continue
-            feature_hit = feature_tuple(feature.qualifiers['label'][0],
+                color = COLORS['misc']
+
+            feature_name = feature.qualifiers.get('label', [f'Unnamed {feature_type}'])
+
+            if not feature_name:
+                feature_name = f'Unnamed {feature_type}'
+            else:
+                feature_name = feature_name[0]
+
+            # Filter out CDSs that match the start and end of a gene
+            if feature_type in translation_names:
+                for gene in features_list:
+                    if gene.type == 'gene' and feature.location.start == gene.start and feature.location.end == gene.end:
+                        break
+                else:
+                    feature_hit = feature_tuple(feature_name,
                                         int(feature.location.strand),
                                         feature.location.start,
                                         feature.location.end,
                                         color,
-                                        None)
-            features_list.append(feature_hit)
+                                        None,
+                                        feature_type)
+                    features_list.append(feature_hit)
+            else:
+                # Add the processed feature to the list
+                feature_hit = feature_tuple(feature_name,
+                                            int(feature.location.strand),
+                                            feature.location.start,
+                                            feature.location.end,
+                                            color,
+                                            None,
+                                            feature_type)
+                features_list.append(feature_hit)
 
         end_positions = dict()
         #for strand in [strandless_features, forward_features, reverse_features]:  Dont care about organizing this
@@ -331,7 +380,9 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                     strand[i] = feature._replace(nest_level=lowest_level+1)
             for position in end_positions:
                 end_positions[position] = "inf"
-
+    if not name and sequences[0].name:
+        # Get the name from the first contig in the genbank file
+        name = sequences[0].name
     # Load sequence
     i = 0
     main_seq = None
@@ -340,7 +391,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
         if i > 1:
             exit()
         main_seq = this_seq.upper()
-
 
     # ------------------------------------------------------------------------------
     # PERFORM TERMINATOR PREDICTIONS
@@ -362,10 +412,11 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                                         score""")
     rhotermpredict_results = []
     for result in rhotermpredict_predictions:
+        print(result)
         rhotermpredict_results.append(rdtresult(result.strand,
                                                 result.c_over_g,
-                                                result.start_rut,
-                                                result.end_rut,
+                                                result.start_rut-circular_length,
+                                                result.end_rut-circular_length,
                                                 result.term_seq,
                                                 result.downstream_seq,
                                                 result.palindromes,
@@ -374,14 +425,14 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
 
 
     logger.info('Running RIT_predict_TransTerm')
-    transterm_predictions = transterm(input_file_name)
+    transterm_predictions = transterm(input_file_name, circular_length)
     # ------------------------------------------------------------------------------
     # PERFORM PROMOTER PREDICTION
     # ------------------------------------------------------------------------------
 
     # Predict promoters
     logger.info('Running TSS_predict_promoter_calculator')
-    promoter_calc_predictions = promocalc(main_seq, threads=threads)
+    promoter_calc_predictions = promocalc(main_seq, circular_length=circular_length, threads=threads)
 
     # ------------------------------------------------------------------------------
     # PERFORM orf PREDICTION / GENERATE ANNOTATION FILE
@@ -443,10 +494,10 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                 continue
 
             assert rbs_info.start_codon == orf_info['start_codon']
-            
+
             array = max(int(orf['end']) - int(orf['start']), int(orf['start']) - int(orf['end'])) + 1
-            processed_orf = expressed_orf(int(orf_info['start']),
-                                            int(orf_info['end']),
+            processed_orf = expressed_orf(int(orf_info['start'])-circular_length,
+                                            int(orf_info['end'])-circular_length,
                                             rbs_score,  # Log Version
                                             orf_length * rbs_info.score,  # Non log version
                                             rbs_info.score2,
@@ -454,7 +505,7 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                                             rbs_info.start_codon,
                                             orf_info["strand"]
                                             )
-            expressed_orfs.append(processed_orf) 
+            expressed_orfs.append(processed_orf)
 
             total_burden += orf_length * rbs_info.score
 
@@ -477,18 +528,16 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
 
     if circular:
 
+
         # Remove ones with out of bounds starts/ends/positions (whichever is graphed)
-        orf_predictions = list(filter(lambda x: (int(x['start']) <= len(single_sequence)), orf_predictions))
 
-        rbs_predictions = list(filter(lambda x: (int(x.position) <= len(single_sequence)), rbs_predictions))
+        expressed_orfs = list(filter(lambda x: (0 <= int(x.start) < len(single_sequence)), expressed_orfs))
 
-        expressed_orfs = list(filter(lambda x: (int(x.start) <= len(single_sequence)), expressed_orfs))
-        
-        promoter_calc_predictions = list(filter(lambda x: (int(x.TSSpos) <= len(single_sequence)), promoter_calc_predictions))
+        promoter_calc_predictions = list(filter(lambda x: 0< int(x.TSSpos) < len(single_sequence), promoter_calc_predictions))
 
-        transterm_predictions = list(filter(lambda x: (int(x.start) <= len(single_sequence)), transterm_predictions))
+        transterm_predictions = list(filter(lambda x: 0< int(x.start) < len(single_sequence), transterm_predictions))
 
-        rhotermpredict_results = list(filter(lambda x: (int(x.start_rut) <= len(single_sequence)), rhotermpredict_results))
+        rhotermpredict_results = list(filter(lambda x: 0< int(x.start_rut) < len(single_sequence), rhotermpredict_results))
 
     # Set up the results object
     result = CryptResults(name = name,
@@ -504,8 +553,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
     print(f"Found rho-independent terminators: {len(transterm_predictions)}")
     print(f"Found rho-dependent terminators: {len(rhotermpredict_results)}")
     print(f"Found expressed ORFs: {len(expressed_orfs)}")
-
-
     return result
 
 

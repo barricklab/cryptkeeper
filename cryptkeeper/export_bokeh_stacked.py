@@ -12,12 +12,8 @@ from bokeh.io import curdoc
 from bokeh.plotting import figure, show
 from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div
 from bokeh.embed import components
-import math
-from copy import copy
 
 from bokeh.models.widgets import DataTable, TableColumn
-
-room_for_annotations = 25  # In percent of the graph
 
 
 def plot_boxes(features_list):
@@ -40,7 +36,7 @@ def plot_boxes(features_list):
             start_x_adding, stop_x_adding = stop_x_adding, start_x_adding
             # Now the variables are switched
         
-        expression = float(10 ** abs(feature.expression))  # @TODO: I think this is wrong. 
+        expression = float(10 ** abs(feature.expression))
         if expression > highest_expression:
             highest_expression = expression
         to_add = 0
@@ -118,7 +114,6 @@ def plot_boxes(features_list):
 
 
 def export_bokeh(cryptresult, filename=None):
-    view_format = "mirrored"
     # Set up plot
 
     # Set up the figure
@@ -134,55 +129,19 @@ def export_bokeh(cryptresult, filename=None):
     wigits = []
     tables = {}
 
-    fig.extra_y_ranges = {"y_range2": Range1d(start=0, end=0),
-                          "y_range3": Range1d(start=0, end=0),
-                          "y_range4": Range1d(start=0, end=0),}
+    fig.extra_y_ranges = {"y_range2": Range1d(start=-5000, end=15000),
+                          "y_range3": Range1d(start=0, end=0)}
     fig.add_layout(LinearAxis(y_range_name="y_range3", axis_label="Expression"), 'left')
 
     # set width to length of sequence
     fig.x_range = Range1d(start=0, end=len(cryptresult.sequence))
 
-    # Set up the annotation tracks
-    forward_exists = False
-    reverse_exists = False
-    annotations_exist = bool(cryptresult.annotations)
-    for feature in cryptresult.rho_dep_terminators + cryptresult.rho_ind_terminators + cryptresult.promoters:
-        if feature.strand == "+" and not forward_exists:
-            forward_exists = True
-        elif feature.strand == "-" and not reverse_exists:
-            reverse_exists = True
-        elif forward_exists and reverse_exists:
-            break
 
-    # Draw a line for the top of the annotations
+    # Draw a line for the sequence
     fig.line([0, len(cryptresult.sequence)], [0, 0], line_width=2, color="black", y_range_name="y_range2")
 
-    reverse_height = None
-    forward_height = None
-    if view_format == "stacked" and reverse_exists:
-        forward_exists = True  # The reverse track goes in place of the forward track
-        forward_height = -1000
-        reverse_height = -1000
-        fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
-        annotation_depth = -3000
-    elif forward_exists:
-        # we add the track for forward strand annotations. We will add reverse height later
-        forward_height = -1000
-        fig.line([0, len(cryptresult.sequence)], [-1500, -1500], line_width=2, color="black", y_range_name="y_range2")
-        annotation_depth = -2500
-    elif view_format == "mirrored" and reverse_exists:
-        annotation_depth = -500
-        pass # We will add the reverse track later after we know how much space annotations take up
-    else: # if neither exist
-        annotation_depth = -500
-        pass
-    # Now we add the annotations so we know how much space it takes
-
+    # Add predefined features from the genbank file
     if cryptresult.annotations:
-
-        #annotation_depth -= 500
-        lowest_annotation_y = copy(annotation_depth) - 500
-        
         from Bio import SeqIO
         from Bio.SeqFeature import FeatureLocation
         from Bio.SeqFeature import CompoundLocation
@@ -205,12 +164,13 @@ def export_bokeh(cryptresult, filename=None):
                               'strand': [],
                               }
 
+        
         for genbank_annotation in cryptresult.annotations:
 
             arrow_depth = 100
             if genbank_annotation.end-genbank_annotation.start < arrow_depth:
                     arrow_depth = genbank_annotation.end-genbank_annotation.start
-            annotation_base_y = -1250.*genbank_annotation.nest_level+annotation_depth
+            annotation_base_y = -1250.*genbank_annotation.nest_level-3000
             if genbank_annotation.strand == 1:
                 xs=[genbank_annotation.start, genbank_annotation.start, genbank_annotation.end-arrow_depth, genbank_annotation.end, genbank_annotation.end-arrow_depth]
                 ys=[annotation_base_y+500, annotation_base_y-500, annotation_base_y-500, annotation_base_y, annotation_base_y+500]
@@ -221,10 +181,6 @@ def export_bokeh(cryptresult, filename=None):
                 xs=[genbank_annotation.start, genbank_annotation.start, genbank_annotation.end, genbank_annotation.end]
                 ys=[annotation_base_y-500, annotation_base_y+500, annotation_base_y+500, annotation_base_y-500]
             name = genbank_annotation.name
-
-            # Update lowest annotation y
-            if annotation_base_y-500 < lowest_annotation_y:
-                lowest_annotation_y = annotation_base_y-500
 
             # Define the color
             color = genbank_annotation.color
@@ -242,19 +198,73 @@ def export_bokeh(cryptresult, filename=None):
         genbank_glyphs_hover = HoverTool(renderers=[genbank_glyphs], tooltips=[("Name", "@name")])
         fig.add_tools(genbank_glyphs_hover)
 
-        # Draw a line below the annotations
+    # Add the expressed CDSs
+    expressed_CDSs = cryptresult.translation_sites
+    color_bar_figure = None
+    if expressed_CDSs:
+        # Sort the expressed_CDS by the difference between the start and end
+        def sort_algorythm(x):
+            candidate_1 = x.end - x.start
+            candidate_2 = x.start - x.end
+            return max(candidate_1, candidate_2)
 
-        lowest_annotation_y -= 500
-        fig.line([0, len(cryptresult.sequence)], [lowest_annotation_y, lowest_annotation_y], line_width=2, color="black", y_range_name="y_range2")
-        annotation_depth = lowest_annotation_y
 
-    if view_format == "mirrored" and reverse_exists:
-        # We add the track for reverse strand annotations
-        annotation_depth -= 500
-        reverse_height = lowest_annotation_y-500
-        fig.line([0, len(cryptresult.sequence)], [reverse_height-1000, reverse_height-1000], line_width=2, color="black", y_range_name="y_range2")
-        annotation_depth = reverse_height-1000
-    print(f'Lowest annotation y = {lowest_annotation_y} | View format = {view_format} | Reverse exists = {reverse_exists}')
+        expressed_CDSs = sorted(expressed_CDSs, key=sort_algorythm, reverse=True)
+
+        boxes, highest_expression = plot_boxes(expressed_CDSs)
+        source = ColumnDataSource(boxes)
+
+        cmap = linear_cmap(field_name='burden', palette=viridis(256), low=0, high=highest_expression)
+
+
+        rectangles = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range3")
+        rectangles_hover = HoverTool(renderers=[rectangles], tooltips=[("Position", "@position"), ("Strand", "@strand"), ("RBS Strength", "@rbs_strength"), ("Burden", "@burden")])
+        fig.add_tools(rectangles_hover)
+
+        color_bar = rectangles.construct_color_bar(padding=0,
+                                        ticker=fig.xaxis.ticker,
+                                        formatter=fig.xaxis.formatter)
+        color_bar_figure = figure(title="Burden", title_location="right", width=100, height=750, y_range=(0, highest_expression), toolbar_location=None, min_border=0, outline_line_color=None)
+        color_bar_figure.add_layout(color_bar, 'right')
+        color_bar_figure.title.align = "center"
+        highest_y = max([(x[0]+x[1]) for x in zip(boxes['y'], boxes['h'])])
+
+        max_y = TextInput(title="Max y", value=str(highest_y))
+        max_y_js = CustomJS(args=dict(plotRange1=fig.y_range, plotRange2=fig.extra_y_ranges["y_range3"]), code="""
+    var newEnd = Number(cb_obj.value)
+    plotRange2.start = newEnd * -1/3     
+    plotRange2.end = newEnd                        
+""")
+        wigits.append((max_y, max_y_js))
+
+        max_burden = TextInput(title="Max burden", value=str(highest_expression))
+        max_burden_js = CustomJS(args=dict(color_bar=color_bar), code="""
+    var newMax = Number(cb_obj.value)
+    color_bar.color_mapper.high = newMax
+""")
+        wigits.append((max_burden, max_burden_js))
+
+        # Add table
+        expressed_CDSs = sorted(expressed_CDSs, key=lambda x: x.burden, reverse=True)
+        name = 'Expressed CDSs'
+        expressed_CDSs_table = generate_bokeh_table(expressed_CDSs, name)
+        tables[name] = expressed_CDSs_table
+
+
+        # Javascript to hide CDSs less than 45 bases
+        hide_short_CDSs_js = CustomJS(args=dict(rectangles=rectangles), code="""
+    var newMin = 45
+    rectangles.visible = true
+    for (var i = 0; i < rectangles.data_source.data['w'].length; i++) {
+        if (rectangles.data_source.data['w'][i] < newMin) {
+            rectangles.data_source.data['w'][i] = 0
+            rectangles.data_source.data['h'][i] = 0
+        }
+    }
+    rectangles.data_source.change.emit()
+""")
+        curdoc().on_event(DocumentReady, hide_short_CDSs_js)
+
 
     # add promoters
     promoters = cryptresult.promoters
@@ -271,10 +281,7 @@ def export_bokeh(cryptresult, filename=None):
             if promoter.strand == "-":
                 arrow_shape = [(-x[0], -x[1]) for x in arrow_shape]
             xs = [promoter.TSSpos + x[0] for x in arrow_shape]
-            if promoter.strand == "+":
-                ys = [x[1]+forward_height for x in arrow_shape]
-            else:
-                ys = [x[1]+reverse_height for x in arrow_shape]
+            ys = [x[1]-1000 for x in arrow_shape]
             promoter_dict['x'].append(xs)
             promoter_dict['y'].append(ys)
             promoter_dict['position'].append(promoter.TSSpos)
@@ -326,10 +333,7 @@ def export_bokeh(cryptresult, filename=None):
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
             xs = [terminator.start_rut + x[0] for x in t_shape]
-            if terminator.strand == "+":
-                ys = [x[1]+forward_height for x in t_shape]
-            else:
-                ys = [x[1]+reverse_height for x in t_shape]
+            ys = [x[1]-1000 for x in t_shape]
             ritterminator_dict['x'].append(xs)
             ritterminator_dict['y'].append(ys)
             ritterminator_dict['position'].append(f'{terminator.start_rut}-{terminator.end_rut}')
@@ -375,10 +379,7 @@ def export_bokeh(cryptresult, filename=None):
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
             xs = [terminator.start + x[0] for x in t_shape]
-            if terminator.strand == "+":
-                ys = [x[1]+forward_height for x in t_shape]
-            else:
-                ys = [x[1]+reverse_height for x in t_shape]
+            ys = [x[1]-1000 for x in t_shape]
             terminator_dict['x'].append(xs)
             terminator_dict['y'].append(ys)
             terminator_dict['position'].append(f'{terminator.start}-{terminator.end}')
@@ -410,168 +411,13 @@ def export_bokeh(cryptresult, filename=None):
         ridpt_table = generate_bokeh_table(ridpt, name)
         tables[name] = ridpt_table
 
-    # Add the expressed CDSs
-    expressed_CDSs = cryptresult.translation_sites
-    color_bar_figure = None
-    if expressed_CDSs:
-        # Sort the expressed_CDS by the difference between the start and end
-        def sort_algorythm(x):
-            candidate_1 = x.end - x.start
-            candidate_2 = x.start - x.end
-            return max(candidate_1, candidate_2)
+    # Extra line below promoters and terminators
+    fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
 
+    # set y axis min and max of y_range3
+    fig.extra_y_ranges["y_range3"].start = -highest_y/3
+    fig.extra_y_ranges["y_range3"].end = highest_y
 
-        expressed_CDSs = sorted(expressed_CDSs, key=sort_algorythm, reverse=True)
-
-        if view_format == "mirrored":
-            # Get the forward strand CDSs
-            expressed_CDSs_fwd = [x for x in expressed_CDSs if x.strand == "+"]
-            boxes_fwd, highest_expression_fwd = plot_boxes(expressed_CDSs_fwd)
-            highest_y_pos = max([(x[0]+x[1]) for x in zip(boxes_fwd['y'], boxes_fwd['h'])])
-
-            # Get the reverse strand CDSs
-            expressed_CDSs_rev = [x for x in expressed_CDSs if x.strand == "-"]
-            boxes_rev, highest_expression_rev = plot_boxes(expressed_CDSs_rev)
-            highest_y_neg = max([(x[0]+x[1]) for x in zip(boxes_rev['y'], boxes_rev['h'])])
-        elif view_format == "stacked":
-            expressed_CDSs_fwd = [x for x in expressed_CDSs]
-            boxes_fwd, highest_expression_fwd = plot_boxes(expressed_CDSs_fwd)
-            highest_y_pos = max([(x[0]+x[1]) for x in zip(boxes_fwd['y'], boxes_fwd['h'])])
-            boxes_rev, highest_expression_rev = {'x': [], 'y': [], 'w': [], 'h': [], 'rbs_strength': [], 'burden': [], 'position': [], 'strand': []}, 0
-            highest_y_neg = 0
-            expressed_CDSs_rev = []
-        else:
-            raise ValueError(f'view_format must be "mirrored" or "stacked". {view_format} is not a valid option.')
-
-        highest_expression = max(highest_expression_fwd, highest_expression_rev)
-
-        # Calculate the space needed for the annotations
-        total_range = highest_y_pos + highest_y_neg
-        room_on_graph_for_annotations = (total_range * (room_for_annotations / 100))  / (1-(room_for_annotations / 100))
-        total_range = total_range + room_on_graph_for_annotations
-        
-
-        change_each_axis_by = 0
-        
-        # Flip the negative y values and make space for annotations
-        for i in range(len(boxes_fwd['y'])):
-            boxes_fwd['y'][i] = boxes_fwd['y'][i]
-            boxes_fwd['y'][i] += change_each_axis_by
-        for i in range(len(boxes_rev['y'])):
-            boxes_rev['y'][i] = (-boxes_rev['y'][i])
-            boxes_rev['y'][i] -= change_each_axis_by
-
-        # Plot the forward and the reverse (if they exist)
-        cmap = linear_cmap(field_name='burden', palette=viridis(256), low=0, high=highest_expression)
-        if forward_exists:
-            source = ColumnDataSource(boxes_fwd)
-            rectangles_fwd = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range3")
-            rectangles_fwd_hover = HoverTool(renderers=[rectangles_fwd], tooltips=[("Position", "@position"), ("Strand", "@strand"), ("RBS Strength", "@rbs_strength"), ("Burden", "@burden")])
-            fig.add_tools(rectangles_fwd_hover)
-        if reverse_exists:
-            source = ColumnDataSource(boxes_rev)
-            rectangles_rev = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range4")
-            rectangles_rev_hover = HoverTool(renderers=[rectangles_rev], tooltips=[("Position", "@position"), ("Strand", "@strand"), ("RBS Strength", "@rbs_strength"), ("Burden", "@burden")])
-            fig.add_tools(rectangles_rev_hover)
-
-        boxes = {key: boxes_fwd.get(key, 0) + boxes_rev.get(key, 0) for key in set(boxes_fwd) | set(boxes_rev)}
-
-        source = ColumnDataSource(boxes)
-
-
-        if forward_exists:
-            color_bar = rectangles_fwd.construct_color_bar(padding=0,
-                                            ticker=fig.xaxis.ticker,
-                                            formatter=fig.xaxis.formatter)
-        else:
-            color_bar = rectangles_fwd.construct_color_bar(padding=0,
-                                            ticker=fig.xaxis.ticker,
-                                            formatter=fig.xaxis.formatter)
-        color_bar_figure = figure(title="Burden", title_location="right", width=100, height=750, y_range=(0, highest_expression), toolbar_location=None, min_border=0, outline_line_color=None)
-        color_bar_figure.add_layout(color_bar, 'right')
-        color_bar_figure.title.align = "center"
-
-        max_y_pos = TextInput(title="Max Y (Top track)", value=str(highest_y_pos))
-        max_y_neg = TextInput(title="Max Y (Bottom track)", value=str(highest_y_neg))
-        max_y_js = CustomJS(args=dict(plotRange1=fig.y_range,
-                                       plotRangeAnnotations=fig.extra_y_ranges["y_range2"],
-                                       plotRangeTop=fig.extra_y_ranges["y_range3"],
-                                       plotRangeBot=fig.extra_y_ranges["y_range4"],
-                                       max_y_top=max_y_pos,
-                                       may_y_bot=max_y_neg,
-                                       annotation_space=room_on_graph_for_annotations,
-                                       annotation_depth= annotation_depth),
-                                         code="""
-    var newMaxYPos = Number(max_y_top.value)
-    var newMaxYNeg = Number(may_y_bot.value)
-    var AnnotationSpace = Number(annotation_space)
-    var total_space = newMaxYPos + newMaxYNeg + AnnotationSpace
-
-    plotRangeTop.start = newMaxYPos-total_space
-    plotRangeTop.end = newMaxYPos
-
-    plotRangeBot.start = -newMaxYNeg
-    plotRangeBot.end = total_space-newMaxYNeg
-
-    var annotation_percent = AnnotationSpace / total_space
-    var annotation_depth = Number(annotation_depth)
-    var top_percent = newMaxYPos / total_space
-    var bot_percent = newMaxYNeg / total_space
-
-    var ptsPerPercent = -annotation_depth / annotation_percent
-    var toppts = ptsPerPercent * top_percent
-    var botpts = ptsPerPercent * bot_percent
-
-    plotRangeAnnotations.start = -botpts+annotation_depth
-    plotRangeAnnotations.end = toppts
-
-""")
-        curdoc().js_on_event(DocumentReady, max_y_js)
-        wigits.append((max_y_pos, max_y_js))
-        wigits.append((max_y_neg, max_y_js))
-
-        max_burden = TextInput(title="Max burden", value=str(highest_expression))
-        max_burden_js = CustomJS(args=dict(color_bar=color_bar), code="""
-    var newMax = Number(cb_obj.value)
-    color_bar.color_mapper.high = newMax
-""")
-        wigits.append((max_burden, max_burden_js))
-
-        # Add table
-        expressed_CDSs = sorted(expressed_CDSs, key=lambda x: x.burden, reverse=True)
-        name = 'Expressed CDSs'
-        expressed_CDSs_table = generate_bokeh_table(expressed_CDSs, name)
-        tables[name] = expressed_CDSs_table
-
-
-        # Javascript to hide CDSs less than 45 bases
-        js_string = """
-    var newMin = 45
-    rectangles.visible = true
-    for (var i = 0; i < rectangles.data_source.data['w'].length; i++) {
-        if (rectangles.data_source.data['w'][i] < newMin) {
-            rectangles.data_source.data['w'][i] = 0
-            rectangles.data_source.data['h'][i] = 0
-        }
-    }
-    rectangles.data_source.change.emit()
-"""
-        if forward_exists:
-            hide_short_CDSs_js_fwd = CustomJS(args=dict(rectangles=rectangles_fwd), code=js_string)
-            curdoc().on_event(DocumentReady, hide_short_CDSs_js_fwd)
-        if reverse_exists:
-            hide_short_CDSs_js_rev = CustomJS(args=dict(rectangles=rectangles_rev), code=js_string)
-            curdoc().on_event(DocumentReady, hide_short_CDSs_js_rev)
-
-    '''
-    # fix the Y axis tickers
-    ticker_locations = [n+change_each_axis_by for n in range(0, 1000*1000, 1000)]
-    fig.yaxis.ticker =   ticker_locations + [y*-1 for y in   ticker_locations]
-    ticker_labels = {n: str(n-change_each_axis_by) for n in ticker_locations}
-    ticker_labels = {**ticker_labels, **{y*-1: str(y*-1+change_each_axis_by) for y in ticker_locations}}
-    # Round the labels to the nearest int
-    fig.yaxis.major_label_overrides = {k: str(abs(int(float(v)))) for k, v in ticker_labels.items()}
-    '''
 
     # Build a DIV above the plot that contains the name of the plot and the total burden
     if cryptresult.name:

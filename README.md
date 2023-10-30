@@ -9,6 +9,8 @@ Cryptkeeper is currently in development. Adventurous users can install dependenc
 * `conda activate cryptkeeper`
 * `pip install ./`
 
+It may be necessary to install [rhotermpredict](https://github.com/barricklab/RhoTermPredict), [promotercalculator](https://github.com/barricklab/promoter-calculator), and [ostir](https://github.com/barricklab/ostir) from their repositories to avoid version mismatch as development continues.
+
 
 ## Example
 
