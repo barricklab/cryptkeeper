@@ -16,6 +16,8 @@ import math
 from copy import copy
 
 from bokeh.models.widgets import DataTable, TableColumn
+from bokeh.core.validation import silence
+from bokeh.core.validation.warnings import MISSING_RENDERERS
 
 room_for_annotations = 25  # In percent of the graph
 
@@ -485,9 +487,11 @@ def export_bokeh(cryptresult, filename=None):
             color_bar = rectangles_fwd.construct_color_bar(padding=0,
                                             ticker=fig.xaxis.ticker,
                                             formatter=fig.xaxis.formatter)
+
         color_bar_figure = figure(title="Burden", title_location="right", width=100, height=750, y_range=(0, highest_expression), toolbar_location=None, min_border=0, outline_line_color=None)
         color_bar_figure.add_layout(color_bar, 'right')
         color_bar_figure.title.align = "center"
+        silence(warning=MISSING_RENDERERS)
 
         max_y_pos = TextInput(title="Max Y (Top track)", value=str(highest_y_pos))
         max_y_neg = TextInput(title="Max Y (Bottom track)", value=str(highest_y_neg))
