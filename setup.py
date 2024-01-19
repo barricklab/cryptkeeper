@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="cryptkeeper",
     version="0.1",
-    packages=find_packages(),
+    packages=find_packages(include=['cryptkeeper']),
 
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
@@ -20,7 +20,9 @@ setup(
         "Source Code": "https://github.com/barricklab/cryptkeeper",
     },
     classifiers=[
-        "License :: GNU General Public License v2.0"
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+        "Operating System :: OS Independent",
     ],
     entry_points={
         'console_scripts' : [
