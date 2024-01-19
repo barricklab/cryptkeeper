@@ -10,14 +10,22 @@ from bokeh.layouts import column, row
 from bokeh.events import DocumentReady
 from bokeh.io import curdoc
 from bokeh.plotting import figure, show
-from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div
+from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div, FuncTickFormatter
 from bokeh.embed import components
 import math
 from copy import copy
+from Bio import SeqIO
+from Bio.SeqFeature import FeatureLocation
+from Bio.SeqFeature import CompoundLocation
+from Bio.SeqFeature import ExactPosition
+from Bio.SeqFeature import BeforePosition
+from Bio.SeqFeature import AfterPosition
+from Bio.SeqFeature import UnknownPosition
 
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.core.validation import silence
 from bokeh.core.validation.warnings import MISSING_RENDERERS
+from bokeh.models import AdaptiveTicker
 
 room_for_annotations = 25  # In percent of the graph
 
@@ -118,7 +126,7 @@ def plot_boxes(features_list):
     return bokah_orfs, highest_burden
 
 
-def export_bokeh(cryptresult, filename=None):
+def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     view_format = "mirrored"
     # Set up plot
 
@@ -138,7 +146,8 @@ def export_bokeh(cryptresult, filename=None):
     fig.extra_y_ranges = {"y_range2": Range1d(start=0, end=0),
                           "y_range3": Range1d(start=0, end=0),
                           "y_range4": Range1d(start=0, end=0),}
-    fig.add_layout(LinearAxis(y_range_name="y_range3", axis_label="Expression"), 'left')
+    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Expression")
+    fig.add_layout(shownaxis, 'left')
 
     # set width to length of sequence
     fig.x_range = Range1d(start=0, end=len(cryptresult.sequence))
@@ -183,21 +192,6 @@ def export_bokeh(cryptresult, filename=None):
 
         #annotation_depth -= 500
         lowest_annotation_y = copy(annotation_depth) - 500
-        
-        from Bio import SeqIO
-        from Bio.SeqFeature import FeatureLocation
-        from Bio.SeqFeature import CompoundLocation
-        from Bio.SeqFeature import ExactPosition
-        from Bio.SeqFeature import BeforePosition
-        from Bio.SeqFeature import AfterPosition
-        from Bio.SeqFeature import UnknownPosition
-        from Bio.SeqFeature import FeatureLocation
-        from Bio.SeqFeature import CompoundLocation
-        from Bio.SeqFeature import ExactPosition
-        from Bio.SeqFeature import BeforePosition
-        from Bio.SeqFeature import AfterPosition
-        from Bio.SeqFeature import UnknownPosition
-
         genbank_dictionary = {'x': [],
                               'y': [],
                               'color': [],
@@ -210,7 +204,7 @@ def export_bokeh(cryptresult, filename=None):
 
             arrow_depth = 100
             if genbank_annotation.end-genbank_annotation.start < arrow_depth:
-                    arrow_depth = genbank_annotation.end-genbank_annotation.start
+                arrow_depth = genbank_annotation.end-genbank_annotation.start
             annotation_base_y = -1250.*genbank_annotation.nest_level+annotation_depth
             if genbank_annotation.strand == 1:
                 xs=[genbank_annotation.start, genbank_annotation.start, genbank_annotation.end-arrow_depth, genbank_annotation.end, genbank_annotation.end-arrow_depth]
@@ -565,15 +559,33 @@ def export_bokeh(cryptresult, filename=None):
             hide_short_CDSs_js_rev = CustomJS(args=dict(rectangles=rectangles_rev), code=js_string)
             curdoc().on_event(DocumentReady, hide_short_CDSs_js_rev)
 
-    '''
     # fix the Y axis tickers
-    ticker_locations = [n+change_each_axis_by for n in range(0, 1000*1000, 1000)]
-    fig.yaxis.ticker =   ticker_locations + [y*-1 for y in   ticker_locations]
-    ticker_labels = {n: str(n-change_each_axis_by) for n in ticker_locations}
-    ticker_labels = {**ticker_labels, **{y*-1: str(y*-1+change_each_axis_by) for y in ticker_locations}}
+    ticker_locations = [n for n in range(0, 1000*1000, tick_frequency)]
+    fig.yaxis.ticker =   ticker_locations + [y*-1-room_on_graph_for_annotations for y in   ticker_locations]
+    ticker_labels = {n: str(n) for n in ticker_locations}
+    ticker_labels = {**ticker_labels, **{y*-1-room_on_graph_for_annotations: str(y) for y in ticker_locations}}
+
+    js_string = """
+    const ticker_locations = Array.from({length: 1000}, (_, i) => i * tick_frequency);
+fig.yaxis.ticker = [
+  ...ticker_locations,
+  ...ticker_locations.map(y => y * -1 - room_on_graph_for_annotations)
+];
+
+let ticker_labels = {};
+ticker_locations.forEach(n => {
+  ticker_labels[n] = String(n);
+});
+ticker_locations.forEach(y => {
+  ticker_labels[y * -1 - room_on_graph_for_annotations] = String(y);
+});
+    """
+
+    ticker_js = CustomJS(args=dict(fig=fig, room_on_graph_for_annotations=room_on_graph_for_annotations, tick_frequency=tick_frequency), code=js_string)
+    curdoc().on_event(DocumentReady, ticker_js)
+
     # Round the labels to the nearest int
     fig.yaxis.major_label_overrides = {k: str(abs(int(float(v)))) for k, v in ticker_labels.items()}
-    '''
 
     # Build a DIV above the plot that contains the name of the plot and the total burden
     if cryptresult.name:
@@ -598,6 +610,8 @@ def export_bokeh(cryptresult, filename=None):
     #layout = column(layout, widgets, styles={'margin': '0 auto', 'align-items': 'center'})
     layout = column(name_div, burden_div, layout, widgets, styles={'margin': '0 auto', 'align-items': 'center'})
     layout.sizing_mode = 'scale_width'
+
+        # Set up Y axis ticks
 
     # Add the tables
     if tables:

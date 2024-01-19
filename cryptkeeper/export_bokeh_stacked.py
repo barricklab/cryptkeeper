@@ -5,18 +5,27 @@ import pandas as pd
 import bokeh
 from bokeh.transform import linear_cmap
 from bokeh.palettes import viridis
-from bokeh.plotting import output_file, save
 from bokeh.layouts import column, row
 from bokeh.events import DocumentReady
 from bokeh.io import curdoc
-from bokeh.plotting import figure, show
-from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div
+from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div, FuncTickFormatter
 from bokeh.embed import components
 
 from bokeh.models.widgets import DataTable, TableColumn
 
 
 def plot_boxes(features_list):
+    """
+    Generate a plot of boxes based on a list of features.
+
+    Parameters:
+    - features_list (list): A list of features.
+
+    Returns:
+    - bokah_orfs (dict): A dictionary containing the x, y, w, h, rbs_strength, burden, position, and strand values for each placed ORF.
+    - highest_burden (float): The highest burden value among all placed ORFs.
+    """
 
     placed_ORFs = pd.DataFrame(columns=["start_x", "stop_x", "start_y", "stop_y", "burden", "strand", "expression"])
     highest_expression = 0
@@ -31,11 +40,11 @@ def plot_boxes(features_list):
         if burden > highest_burden:
             highest_burden = burden
 
-        
+
         if start_x_adding > stop_x_adding:  # Then the ORF is reverse stranded
             start_x_adding, stop_x_adding = stop_x_adding, start_x_adding
             # Now the variables are switched
-        
+
         expression = float(10 ** abs(feature.expression))
         if expression > highest_expression:
             highest_expression = expression
@@ -57,10 +66,10 @@ def plot_boxes(features_list):
                     continue
                 if stop_x_adding <= start_x_checking:
                     continue
-                
+
                 if np.sign(expression) != np.sign(stop_y_checking):
                     continue
-                
+
                 if np.sign(expression) == 1:
                     if start_y_adding >= stop_y_checking:
                         continue
@@ -69,7 +78,7 @@ def plot_boxes(features_list):
                     to_add = stop_y_checking
                     about_to_break = True
                     break
-                
+
                 if np.sign(expression) == -1:
                     if start_y_adding <= stop_y_checking:
                         continue
@@ -78,13 +87,13 @@ def plot_boxes(features_list):
                     to_add = stop_y_checking
                     about_to_break = True
                     break
-                
+
                 about_to_break = True
                 break
             
             if not about_to_break:
                 failed = False
-        
+
         placed_ORFs.loc[placed_ORFs.shape[0]] = [start_x_adding, stop_x_adding, start_y_adding, stop_y_adding, burden, strand, expression]
 
 
@@ -142,20 +151,6 @@ def export_bokeh(cryptresult, filename=None):
 
     # Add predefined features from the genbank file
     if cryptresult.annotations:
-        from Bio import SeqIO
-        from Bio.SeqFeature import FeatureLocation
-        from Bio.SeqFeature import CompoundLocation
-        from Bio.SeqFeature import ExactPosition
-        from Bio.SeqFeature import BeforePosition
-        from Bio.SeqFeature import AfterPosition
-        from Bio.SeqFeature import UnknownPosition
-        from Bio.SeqFeature import FeatureLocation
-        from Bio.SeqFeature import CompoundLocation
-        from Bio.SeqFeature import ExactPosition
-        from Bio.SeqFeature import BeforePosition
-        from Bio.SeqFeature import AfterPosition
-        from Bio.SeqFeature import UnknownPosition
-
         genbank_dictionary = {'x': [],
                               'y': [],
                               'color': [],
@@ -169,7 +164,7 @@ def export_bokeh(cryptresult, filename=None):
 
             arrow_depth = 100
             if genbank_annotation.end-genbank_annotation.start < arrow_depth:
-                    arrow_depth = genbank_annotation.end-genbank_annotation.start
+                arrow_depth = genbank_annotation.end-genbank_annotation.start
             annotation_base_y = -1250.*genbank_annotation.nest_level-3000
             if genbank_annotation.strand == 1:
                 xs=[genbank_annotation.start, genbank_annotation.start, genbank_annotation.end-arrow_depth, genbank_annotation.end, genbank_annotation.end-arrow_depth]
@@ -275,7 +270,7 @@ def export_bokeh(cryptresult, filename=None):
                      'position': [],
                      'score': [],
                      'strand': []}
-        
+
         for promoter in promoters:
             arrow_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 350), (100, 450), (50, 550), (50, 500), (-10, 500), (-10, 50))
             if promoter.strand == "-":
@@ -443,6 +438,7 @@ def export_bokeh(cryptresult, filename=None):
     layout = column(name_div, burden_div, layout, widgets, styles={'margin': '0 auto', 'align-items': 'center'})
     layout.sizing_mode = 'scale_width'
 
+
     # Add the tables
     if tables:
         if len(tables) > 1:
@@ -479,12 +475,12 @@ def export_bokeh(cryptresult, filename=None):
 
     return fig
 
-def generate_bokeh_table(list, name) -> DataTable:
+def generate_bokeh_table(datalist, name) -> DataTable:
     # Generate a bokeh table from a list of named tuples
-    column_names = list[0]._fields
-    table_name = list[0].__class__.__name__
+    column_names = datalist[0]._fields
+    table_name = datalist[0].__class__.__name__
     data = {column_name: [] for column_name in column_names}
-    for row in list:
+    for row in datalist:
         for column_name in column_names:
             data[column_name].append(getattr(row, column_name))
     source = ColumnDataSource(data)

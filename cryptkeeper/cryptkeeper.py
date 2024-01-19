@@ -86,6 +86,14 @@ def main() -> None:
         help="Minimum score that is graphed and output to final files (all are used in calculating burden)",
     )
     parser.add_argument(
+        '-t',
+        action='store',
+        dest='tick_frequency',
+        default=1000,
+        type=int,
+        help="Y axis tick frequency (default 1000)",
+    )
+    parser.add_argument(
         '--matplotlib',
         action='store_true',
         dest='matplotlib',
@@ -115,7 +123,7 @@ def main() -> None:
         DeprecationWarning('Matplotlib base plotting will be replaced with bokah soon')
         plot(result, options.o + "_graph.html")
     else:
-        plot_filepath = export_bokeh(result, options.o + "_graph.html")
+        plot_filepath = export_bokeh(result, tick_frequency=options.tick_frequency, filename=options.o + "_graph.html")
         webbrowser.open(plot_filepath)
 
     # Print a message indicating that the process is done
