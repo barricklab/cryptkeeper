@@ -1,33 +1,26 @@
 # Visualize the data on a bokah plot
-import numpy as np
+
 import os
-import pandas as pd
+import copy
+import shutil
 import bokeh
+import numpy as np
+import pandas as pd
 from bokeh.transform import linear_cmap
 from bokeh.palettes import viridis
-from bokeh.plotting import output_file, save
 from bokeh.layouts import column, row
 from bokeh.events import DocumentReady
 from bokeh.io import curdoc
-from bokeh.plotting import figure, show
-from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div, FuncTickFormatter
+from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div
 from bokeh.embed import components
-import math
-from copy import copy
-from Bio import SeqIO
-from Bio.SeqFeature import FeatureLocation
-from Bio.SeqFeature import CompoundLocation
-from Bio.SeqFeature import ExactPosition
-from Bio.SeqFeature import BeforePosition
-from Bio.SeqFeature import AfterPosition
-from Bio.SeqFeature import UnknownPosition
-
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.core.validation import silence
 from bokeh.core.validation.warnings import MISSING_RENDERERS
-from bokeh.models import AdaptiveTicker
 
-room_for_annotations = 25  # In percent of the graph
+
+ANNOTATION_SPACE = 25  # In percent of the graph
+GLYPH_SCALING = 1.2
 
 
 def plot_boxes(features_list):
@@ -38,7 +31,13 @@ def plot_boxes(features_list):
     Returns:
         tuple: A tuple containing the dictionary of bokah ORFs with their coordinates and attributes, and the highest burden value.
     """
-    placed_ORFs = pd.DataFrame(columns=["start_x", "stop_x", "start_y", "stop_y", "burden", "strand", "expression"])
+    placed_ORFs = pd.DataFrame(columns=["start_x",
+                                        "stop_x",
+                                        "start_y",
+                                        "stop_y",
+                                        "burden",
+                                        "strand",
+                                        "expression"])
     highest_expression = 0
     highest_burden = 0
 
@@ -100,7 +99,13 @@ def plot_boxes(features_list):
             if not about_to_break:
                 failed = False
 
-        placed_ORFs.loc[placed_ORFs.shape[0]] = [start_x, stop_x, start_y, stop_y, burden, strand, expression]
+        placed_ORFs.loc[placed_ORFs.shape[0]] = [start_x,
+                                                 stop_x,
+                                                 start_y,
+                                                 stop_y,
+                                                 burden,
+                                                 strand,
+                                                 expression]
 
     bokah_orfs = {
         "x": [],
@@ -130,6 +135,8 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     view_format = "mirrored"
     # Set up plot
 
+    annotation_scale_range = len(cryptresult.sequence)
+
     # Set up the figure
     fig = figure(width=1500, height=750,)
     fig.xaxis.axis_label = "Position"
@@ -149,13 +156,15 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Expression")
     fig.add_layout(shownaxis, 'left')
 
+    fig.extra_x_ranges = {"x_range2": Range1d(start=0, end=annotation_scale_range),
+                          "x_range3": Range1d(start=0, end=len(cryptresult.sequence)),}
+
     # set width to length of sequence
     fig.x_range = Range1d(start=0, end=len(cryptresult.sequence))
 
     # Set up the annotation tracks
     forward_exists = False
     reverse_exists = False
-    annotations_exist = bool(cryptresult.annotations)
     for feature in cryptresult.rho_dep_terminators + cryptresult.rho_ind_terminators + cryptresult.promoters:
         if feature.strand == "+" and not forward_exists:
             forward_exists = True
@@ -165,7 +174,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
             break
 
     # Draw a line for the top of the annotations
-    fig.line([0, len(cryptresult.sequence)], [0, 0], line_width=2, color="black", y_range_name="y_range2")
+    fig.line([0, annotation_scale_range], [0, 0], line_width=2, color="black", y_range_name="y_range2", x_range_name="x_range2")
 
     reverse_height = None
     forward_height = None
@@ -173,25 +182,23 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         forward_exists = True  # The reverse track goes in place of the forward track
         forward_height = -1000
         reverse_height = -1000
-        fig.line([0, len(cryptresult.sequence)], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2")
+        fig.line([0, annotation_scale_range], [-2000, -2000], line_width=2, color="black", y_range_name="y_range2", x_range_name="x_range2")
         annotation_depth = -3000
     elif forward_exists:
         # we add the track for forward strand annotations. We will add reverse height later
         forward_height = -1000
-        fig.line([0, len(cryptresult.sequence)], [-1500, -1500], line_width=2, color="black", y_range_name="y_range2")
+        fig.line([0, annotation_scale_range], [-1500, -1500], line_width=2, color="black", y_range_name="y_range2", x_range_name="x_range2")
         annotation_depth = -2500
     elif view_format == "mirrored" and reverse_exists:
-        annotation_depth = -500
-        pass # We will add the reverse track later after we know how much space annotations take up
+        annotation_depth = -500  # We will add the reverse track later after we know how much space annotations take up
     else: # if neither exist
         annotation_depth = -500
-        pass
     # Now we add the annotations so we know how much space it takes
 
     if cryptresult.annotations:
 
         #annotation_depth -= 500
-        lowest_annotation_y = copy(annotation_depth) - 500
+        lowest_annotation_y = copy.copy(annotation_depth) - 500
         genbank_dictionary = {'x': [],
                               'y': [],
                               'color': [],
@@ -203,17 +210,23 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         for genbank_annotation in cryptresult.annotations:
 
             arrow_depth = 100
+            # @TODO: SCALE ANNOTATIONS
+
+            scaled_start = genbank_annotation.start * len(cryptresult.sequence) / annotation_scale_range
+            scaled_end = genbank_annotation.end * len(cryptresult.sequence) / annotation_scale_range
+
             if genbank_annotation.end-genbank_annotation.start < arrow_depth:
                 arrow_depth = genbank_annotation.end-genbank_annotation.start
             annotation_base_y = -1250.*genbank_annotation.nest_level+annotation_depth
+            
             if genbank_annotation.strand == 1:
-                xs=[genbank_annotation.start, genbank_annotation.start, genbank_annotation.end-arrow_depth, genbank_annotation.end, genbank_annotation.end-arrow_depth]
+                xs=[scaled_start, scaled_start, scaled_end-arrow_depth, scaled_end, scaled_end-arrow_depth]
                 ys=[annotation_base_y+500, annotation_base_y-500, annotation_base_y-500, annotation_base_y, annotation_base_y+500]
             elif genbank_annotation.strand == -1:
-                xs=[genbank_annotation.end, genbank_annotation.end, genbank_annotation.start+arrow_depth, genbank_annotation.start, genbank_annotation.start+arrow_depth]
+                xs=[scaled_end, scaled_end, scaled_start+arrow_depth, scaled_start, scaled_start+arrow_depth]
                 ys=[annotation_base_y-500, annotation_base_y+500, annotation_base_y+500, annotation_base_y, annotation_base_y-500]
             else:
-                xs=[genbank_annotation.start, genbank_annotation.start, genbank_annotation.end, genbank_annotation.end]
+                xs=[scaled_start, scaled_start, scaled_end, scaled_end]
                 ys=[annotation_base_y-500, annotation_base_y+500, annotation_base_y+500, annotation_base_y-500]
             name = genbank_annotation.name
 
@@ -233,21 +246,21 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
             genbank_dictionary['position'].append(f'{genbank_annotation.start}-{genbank_annotation.end}')
             genbank_dictionary['strand'].append(genbank_annotation.strand)
 
-        genbank_glyphs = fig.patches('x', 'y', color='color', source=genbank_dictionary, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        genbank_glyphs = fig.patches('x', 'y', color='color', source=genbank_dictionary, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2", x_range_name="x_range2")
         genbank_glyphs_hover = HoverTool(renderers=[genbank_glyphs], tooltips=[("Name", "@name")])
         fig.add_tools(genbank_glyphs_hover)
 
         # Draw a line below the annotations
 
         lowest_annotation_y -= 500
-        fig.line([0, len(cryptresult.sequence)], [lowest_annotation_y, lowest_annotation_y], line_width=2, color="black", y_range_name="y_range2")
+        fig.line([0, annotation_scale_range], [lowest_annotation_y, lowest_annotation_y], line_width=2, color="black", y_range_name="y_range2", x_range_name="x_range2")
         annotation_depth = lowest_annotation_y
 
     if view_format == "mirrored" and reverse_exists:
         # We add the track for reverse strand annotations
         annotation_depth -= 500
         reverse_height = lowest_annotation_y-500
-        fig.line([0, len(cryptresult.sequence)], [reverse_height-1000, reverse_height-1000], line_width=2, color="black", y_range_name="y_range2")
+        fig.line([0, annotation_scale_range], [reverse_height-1000, reverse_height-1000], line_width=2, color="black", y_range_name="y_range2", x_range_name="x_range2")
         annotation_depth = reverse_height-1000
 
     # add promoters
@@ -260,11 +273,14 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
                      'score': [],
                      'strand': []}
         
-        for promoter in promoters:
-            arrow_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 350), (100, 450), (50, 550), (50, 500), (-10, 500), (-10, 50))
+        for promoter in promoters: 
+            arrow_shape = ((0, 0), (20, 0), (20, 350), (40, 350), (40, 300), (90, 400), (40, 500), (40, 450), (0, 450), (0, 0))
+            scaled_arrow = [(x[0] * len(cryptresult.sequence) / 10000 * GLYPH_SCALING, x[1]* GLYPH_SCALING) for x in arrow_shape]
+            arrow_shape = scaled_arrow
+            scaled_position = promoter.TSSpos 
             if promoter.strand == "-":
                 arrow_shape = [(-x[0], -x[1]) for x in arrow_shape]
-            xs = [promoter.TSSpos + x[0] for x in arrow_shape]
+            xs = [scaled_position + x[0] for x in arrow_shape]
             if promoter.strand == "+":
                 ys = [x[1]+forward_height for x in arrow_shape]
             else:
@@ -276,7 +292,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
             promoter_dict['strand'].append(promoter.strand)
 
 
-        promoter_glyphs = fig.patches('x', 'y', color='green', source=promoter_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        promoter_glyphs = fig.patches('x', 'y', color='green', source=promoter_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2", x_range_name="x_range2")
         promoter_glyphs_hover = HoverTool(renderers=[promoter_glyphs], tooltips=[("Position", "@position"), ('Strand', '@strand'), ("Score", "@score")])
         fig.add_tools(promoter_glyphs_hover)
 
@@ -316,10 +332,13 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
                            'strand': []}
         # strand, start_rut, end_rut,  score
         for terminator in rdpt:
-            t_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 50))
+            t_shape = ((0, 0), (20, 0), (20, 350), (60, 350), (60, 450), (-40, 450), (-40, 350), (0, 350), (0, 0))
+            scaled_t = [(x[0] * len(cryptresult.sequence) / 10000 * GLYPH_SCALING, x[1] * GLYPH_SCALING) for x in t_shape]
+            t_shape = scaled_t
+            scaled_position = terminator.start_rut 
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
-            xs = [terminator.start_rut + x[0] for x in t_shape]
+            xs = [scaled_position + x[0] for x in t_shape]
             if terminator.strand == "+":
                 ys = [x[1]+forward_height for x in t_shape]
             else:
@@ -330,7 +349,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
             ritterminator_dict['score'].append(terminator.score)
             ritterminator_dict['strand'].append(terminator.strand)
 
-        terminator_glyphs = fig.patches('x', 'y', color='red', source=ritterminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        terminator_glyphs = fig.patches('x', 'y', color='red', source=ritterminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2", x_range_name="x_range2")
         terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ('Strand', '@strand'), ("Score", "@score")])
         fig.add_tools(terminator_glyphs_hover)
 
@@ -364,11 +383,23 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
                             'score': [],
                             'strand': []}
         for terminator in ridpt:
-            t_shape = ((-10, 50), (10, 50), (10, 400), (50, 400), (50, 500), (-50, 500), (-50, 400), (-10, 400), (-10, 50))
-            # strand, conf, start, end
+            t_shape = ((0, 0),
+                       (20, 0),
+                       (20, 350),
+                       (60, 350),
+                       (60, 450),
+                       (-40, 450),
+                       (-40, 350),
+                       (0, 350),
+                       (0, 0))
+            scaled_t = [(x[0] * len(cryptresult.sequence) /
+                         10000 * GLYPH_SCALING, x[1] * GLYPH_SCALING)
+                         for x in t_shape]
+            t_shape = scaled_t
+            scaled_position = terminator.start
             if terminator.strand == "-":
                 t_shape = [(-x[0], -x[1]) for x in t_shape]
-            xs = [terminator.start + x[0] for x in t_shape]
+            xs = [scaled_position + x[0] for x in t_shape]
             if terminator.strand == "+":
                 ys = [x[1]+forward_height for x in t_shape]
             else:
@@ -379,7 +410,14 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
             terminator_dict['score'].append(terminator.conf)
             terminator_dict['strand'].append(terminator.strand)
 
-        terminator_glyphs = fig.patches('x', 'y', color='blue', source=terminator_dict, alpha=0.5, line_color='black', line_width=1, y_range_name="y_range2")
+        terminator_glyphs = fig.patches('x', 'y',
+                                        color='blue',
+                                        source=terminator_dict,
+                                        alpha=0.5,
+                                        line_color='black',
+                                        line_width=1,
+                                        y_range_name="y_range2",
+                                        x_range_name="x_range2")
         terminator_glyphs_hover = HoverTool(renderers=[terminator_glyphs], tooltips=[("Position", "@position"), ('Strand', '@strand'), ("Score", "@score")])
         fig.add_tools(terminator_glyphs_hover)
 
@@ -441,7 +479,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
 
         # Calculate the space needed for the annotations
         total_range = highest_y_pos + highest_y_neg
-        room_on_graph_for_annotations = (total_range * (room_for_annotations / 100))  / (1-(room_for_annotations / 100))
+        room_on_graph_for_annotations = (total_range * (ANNOTATION_SPACE / 100))  / (1-(ANNOTATION_SPACE / 100))
         total_range = total_range + room_on_graph_for_annotations
         
 
@@ -459,12 +497,12 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         cmap = linear_cmap(field_name='burden', palette=viridis(256), low=0, high=highest_expression)
         if forward_exists:
             source = ColumnDataSource(boxes_fwd)
-            rectangles_fwd = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range3")
+            rectangles_fwd = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range3", x_range_name="x_range3")
             rectangles_fwd_hover = HoverTool(renderers=[rectangles_fwd], tooltips=[("Position", "@position"), ("Strand", "@strand"), ("RBS Strength", "@rbs_strength"), ("Burden", "@burden")])
             fig.add_tools(rectangles_fwd_hover)
         if reverse_exists:
             source = ColumnDataSource(boxes_rev)
-            rectangles_rev = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range4")
+            rectangles_rev = fig.rect(x="x", y="y", width="w", height="h", source=source, color=cmap, line_color="black", line_width=1, y_range_name="y_range4", x_range_name="x_range3")
             rectangles_rev_hover = HoverTool(renderers=[rectangles_rev], tooltips=[("Position", "@position"), ("Strand", "@strand"), ("RBS Strength", "@rbs_strength"), ("Burden", "@burden")])
             fig.add_tools(rectangles_rev_hover)
 
@@ -581,7 +619,10 @@ ticker_locations.forEach(y => {
 });
     """
 
-    ticker_js = CustomJS(args=dict(fig=fig, room_on_graph_for_annotations=room_on_graph_for_annotations, tick_frequency=tick_frequency), code=js_string)
+    ticker_js = CustomJS(args=dict(fig=fig,
+                                   room_on_graph_for_annotations=room_on_graph_for_annotations,
+                                   tick_frequency=tick_frequency),
+                         code=js_string)
     curdoc().on_event(DocumentReady, ticker_js)
 
     # Round the labels to the nearest int
@@ -619,7 +660,7 @@ ticker_locations.forEach(y => {
             # Make buttons that show the appropriat tables
             buttons = []
             button_label = Div(text="Tables:")
-            for table_name in tables:
+            for table_name, table_value in tables.items():
                 button = bokeh.models.widgets.Button(label=table_name)
                 button.js_on_click(CustomJS(args=dict(tables=tables, label=table_name), code="""
                 tables[label].visible = true;
@@ -630,7 +671,7 @@ ticker_locations.forEach(y => {
                 }
                 """))
                 buttons.append(button)
-                tables[table_name].visible = False
+                table_value.visible = False
             buttons = row(button_label, *buttons, styles={'margin': '0 auto', 'align-items': 'center'})
             layout = column(layout, buttons, styles={'margin': '0 auto', 'align-items': 'center'})
             layout = column(layout, *tables.values(), styles={'margin': '0 auto', 'align-items': 'center'})
@@ -641,7 +682,6 @@ ticker_locations.forEach(y => {
         script, fig = components(layout)
         export_html(script, fig, filename)
         # copy the assets folder to the output folder if it doesn't exist
-        import shutil
         if os.path.exists(os.path.join(os.path.dirname(filename), "assets")):
             shutil.rmtree(os.path.join(os.path.dirname(filename), "assets"))
         shutil.copytree(os.path.join(os.path.dirname(__file__), "assets"), os.path.join(os.path.dirname(filename), "assets"))
@@ -649,14 +689,14 @@ ticker_locations.forEach(y => {
 
     return fig
 
-def generate_bokeh_table(list, name) -> DataTable:
+def generate_bokeh_table(datalist, name) -> DataTable:
     # Generate a bokeh table from a list of named tuples
-    column_names = list[0]._fields
-    table_name = list[0].__class__.__name__
+    column_names = datalist[0]._fields
+    table_name = datalist[0].__class__.__name__
     data = {column_name: [] for column_name in column_names}
-    for row in list:
+    for datarow in datalist:
         for column_name in column_names:
-            data[column_name].append(getattr(row, column_name))
+            data[column_name].append(getattr(datarow, column_name))
     source = ColumnDataSource(data)
     columns = [TableColumn(field=column_name, title=column_name) for column_name in column_names]
     name_div = Div(text=f"<h1>{name}</h1>")
@@ -668,13 +708,13 @@ def export_html(script, div, filename):
     bokeh_version = bokeh.__version__
     template_path = os.path.join(os.path.dirname(__file__), "assets", "html_template.html")
     asset_location = os.path.join(os.path.dirname(__file__), "assets")
-    with open(template_path, "r") as f:
+    with open(template_path, "r", encoding="utf-8") as f:
         template = f.read()
     template = template.replace("{{bokehscript}}", script)
     template = template.replace("{{bokehdiv}}", div)
     template = template.replace("{{bokehversion}}", bokeh_version)
     template = template.replace("{{assetlocation}}", asset_location)
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write(template)
     return filename
 
