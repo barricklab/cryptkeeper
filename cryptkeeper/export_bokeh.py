@@ -22,6 +22,9 @@ from bokeh.core.validation.warnings import MISSING_RENDERERS
 ANNOTATION_SPACE = 25  # In percent of the graph
 GLYPH_SCALING = 1.2
 
+FONT = 'Arial'
+FONTSIZE = '12pt'
+
 
 def plot_boxes(features_list):
     """
@@ -158,6 +161,24 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
 
     fig.extra_x_ranges = {"x_range2": Range1d(start=0, end=annotation_scale_range),
                           "x_range3": Range1d(start=0, end=len(cryptresult.sequence)),}
+
+    
+    fig.xaxis.axis_label_text_font_size = FONTSIZE
+    fig.yaxis.axis_label_text_font_size = FONTSIZE
+    shownaxis.axis_label_text_font_size = FONTSIZE
+    fig.xaxis.axis_label_text_font = FONT
+    fig.yaxis.axis_label_text_font = FONT
+    shownaxis.axis_label_text_font = FONT
+    fig.xaxis.axis_label_text_font_style = 'bold'
+    fig.yaxis.axis_label_text_font_style = 'bold'
+    shownaxis.axis_label_text_font_style = 'bold'
+    fig.xaxis.major_label_text_font_size = FONTSIZE
+    fig.yaxis.major_label_text_font_size = FONTSIZE
+    shownaxis.major_label_text_font_size = FONTSIZE
+    fig.xaxis.major_label_text_font = FONT
+    fig.yaxis.major_label_text_font = FONT
+    shownaxis.major_label_text_font = FONT
+
 
     # set width to length of sequence
     fig.x_range = Range1d(start=0, end=len(cryptresult.sequence))
@@ -297,7 +318,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         fig.add_tools(promoter_glyphs_hover)
 
         # Add a widget to change the number of promoters shown
-        promoter_number = TextInput(title="Number of promoters", value=str(10))
+        promoter_number = TextInput(title="Number of promoters", value=str(10),)
         promoter_javascript = """
                             var originalPromoData = structuredClone(source)
                             var newNumber = Number(promoter_number.value)
@@ -523,6 +544,11 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         color_bar_figure = figure(title="Burden", title_location="right", width=100, height=750, y_range=(0, highest_expression), toolbar_location=None, min_border=0, outline_line_color=None)
         color_bar_figure.add_layout(color_bar, 'right')
         color_bar_figure.title.align = "center"
+        color_bar_figure.title.text_font_size = FONTSIZE
+        color_bar_figure.title.text_font = FONT
+        color_bar_figure.title.text_font_style = "bold"
+        color_bar.major_label_text_font = FONT
+        color_bar.major_label_text_font_size = FONTSIZE
         silence(warning=MISSING_RENDERERS)
 
         max_y_pos = TextInput(title="Max Y (Top track)", value=str(highest_y_pos))
@@ -630,10 +656,10 @@ ticker_locations.forEach(y => {
 
     # Build a DIV above the plot that contains the name of the plot and the total burden
     if cryptresult.name:
-        name_div = Div(text=f"<h1>{cryptresult.name}</h1>")
+        name_div = Div(text=f'<h1 style="font-family: {FONT}; font-size: {FONTSIZE}">{cryptresult.name}</h1>')
     else:
         name_div = Div()
-    burden_div = Div(text=f"<h2>Total Burden: {cryptresult.burden}</h2>")
+    burden_div = Div(text=f'<h2 style="font-family: {FONT}; font-size: {FONTSIZE}">Total Burden: {cryptresult.burden}</h2>')
 
 
     widgets_to_add = []
