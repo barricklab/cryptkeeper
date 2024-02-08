@@ -4,6 +4,7 @@ import os
 import copy
 import shutil
 import bokeh
+import math
 import numpy as np
 import pandas as pd
 from bokeh.transform import linear_cmap
@@ -21,6 +22,7 @@ from bokeh.core.validation.warnings import MISSING_RENDERERS
 
 ANNOTATION_SPACE = 25  # In percent of the graph
 GLYPH_SCALING = 1.2
+GLYPHS_PER_KB = 3
 
 FONT = 'Arial'
 FONTSIZE = '12pt'
@@ -139,6 +141,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     # Set up plot
 
     annotation_scale_range = len(cryptresult.sequence)
+    number_of_glyphs = math.floor(len(cryptresult.sequence)/1000 *GLYPHS_PER_KB)
 
     # Set up the figure
     fig = figure(width=1500, height=750,)
@@ -318,7 +321,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         fig.add_tools(promoter_glyphs_hover)
 
         # Add a widget to change the number of promoters shown
-        promoter_number = TextInput(title="Number of promoters", value=str(10),)
+        promoter_number = TextInput(title="Number of promoters", value=str(number_of_glyphs),)
         promoter_javascript = """
                             var originalPromoData = structuredClone(source)
                             var newNumber = Number(promoter_number.value)
@@ -375,7 +378,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         fig.add_tools(terminator_glyphs_hover)
 
         # Add a widget to change the number of terminators shown
-        rdpt_number = TextInput(title="Number of Rho-Dependant Terminators", value=str(5))
+        rdpt_number = TextInput(title="Number of Rho-Dependant Terminators", value=str(number_of_glyphs))
         rdpt_javascript = """
                         var originalRDPTData = structuredClone(source)
                         var newNumber = Number(rdpt_number.value)
@@ -443,7 +446,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         fig.add_tools(terminator_glyphs_hover)
 
         # Add a widget to change the number of terminators shown
-        ridpt_number = TextInput(title="Number of Rho-Independant Terminators", value=str(5))
+        ridpt_number = TextInput(title="Number of Rho-Independant Terminators", value=str(number_of_glyphs))
         ridpt_javascript = """
                         var originalRIDPTData = structuredClone(source)
                         var newNumber = Number(ridpt_number.value)
@@ -551,6 +554,8 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         color_bar.major_label_text_font_size = FONTSIZE
         silence(warning=MISSING_RENDERERS)
 
+
+
         max_y_pos = TextInput(title="Max Y (Top track)", value=str(highest_y_pos))
         max_y_neg = TextInput(title="Max Y (Bottom track)", value=str(highest_y_neg))
         max_y_js = CustomJS(args=dict(plotRange1=fig.y_range,
@@ -559,12 +564,14 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
                                        plotRangeBot=fig.extra_y_ranges["y_range4"],
                                        max_y_top=max_y_pos,
                                        may_y_bot=max_y_neg,
-                                       annotation_space=room_on_graph_for_annotations,
+                                       annotation_space=ANNOTATION_SPACE,
                                        annotation_depth= annotation_depth),
                                          code="""
     var newMaxYPos = Number(max_y_top.value)
     var newMaxYNeg = Number(may_y_bot.value)
+    var total_range = newMaxYPos + newMaxYNeg
     var AnnotationSpace = Number(annotation_space)
+    var AnnotationSpace = (total_range * (AnnotationSpace / 100))  / (1-(AnnotationSpace / 100))
     var total_space = newMaxYPos + newMaxYNeg + AnnotationSpace
 
     plotRangeTop.start = newMaxYPos-total_space
@@ -584,6 +591,8 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
 
     plotRangeAnnotations.start = -botpts+annotation_depth
     plotRangeAnnotations.end = toppts
+
+    console.log(plotRangeAnnotations.start, plotRangeAnnotations.end)
 
 """)
         curdoc().js_on_event(DocumentReady, max_y_js)
@@ -631,7 +640,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
 
     js_string = """
     const ticker_locations = Array.from({length: 1000}, (_, i) => i * tick_frequency);
-fig.yaxis.ticker = [
+figticker.ticker = [
   ...ticker_locations,
   ...ticker_locations.map(y => y * -1 - room_on_graph_for_annotations)
 ];
@@ -645,7 +654,7 @@ ticker_locations.forEach(y => {
 });
     """
 
-    ticker_js = CustomJS(args=dict(fig=fig,
+    ticker_js = CustomJS(args=dict(figticker=fig.yaxis,
                                    room_on_graph_for_annotations=room_on_graph_for_annotations,
                                    tick_frequency=tick_frequency),
                          code=js_string)
@@ -659,7 +668,7 @@ ticker_locations.forEach(y => {
         name_div = Div(text=f'<h1 style="font-family: {FONT}; font-size: {FONTSIZE}">{cryptresult.name}</h1>')
     else:
         name_div = Div()
-    burden_div = Div(text=f'<h2 style="font-family: {FONT}; font-size: {FONTSIZE}">Total Burden: {cryptresult.burden}</h2>')
+    burden_div = Div(text=f'<h2 style="font-family: {FONT}; font-size: {FONTSIZE}">Total Burden: {round(cryptresult.burden, 2)}</h2>')
 
 
     widgets_to_add = []
