@@ -558,6 +558,16 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
 
         max_y_pos = TextInput(title="Max Y (Top track)", value=str(highest_y_pos))
         max_y_neg = TextInput(title="Max Y (Bottom track)", value=str(highest_y_neg))
+
+    
+        # fix the Y axis tickers
+        ticker_locations = [n for n in range(0, 1000*1000, tick_frequency)]
+        shownaxis.ticker =   ticker_locations + [y*-1-room_on_graph_for_annotations for y in   ticker_locations]
+        ticker_labels = {n: str(n) for n in ticker_locations}
+        ticker_labels = {**ticker_labels, **{y*-1-room_on_graph_for_annotations: str(y) for y in ticker_locations}}
+        # Round the labels to the nearest int
+        fig.yaxis.major_label_overrides = {k: str(abs(int(float(v)))) for k, v in ticker_labels.items()}
+
         max_y_js = CustomJS(args=dict(plotRange1=fig.y_range,
                                        plotRangeAnnotations=fig.extra_y_ranges["y_range2"],
                                        plotRangeTop=fig.extra_y_ranges["y_range3"],
@@ -565,8 +575,11 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
                                        max_y_top=max_y_pos,
                                        may_y_bot=max_y_neg,
                                        annotation_space=ANNOTATION_SPACE,
-                                       annotation_depth= annotation_depth),
+                                       annotation_depth= annotation_depth,
+                                       figticker=shownaxis,
+                                       tickFrequency=tick_frequency),
                                          code="""
+    // Perform the math necessary to keep the annotation section consistant
     var newMaxYPos = Number(max_y_top.value)
     var newMaxYNeg = Number(may_y_bot.value)
     var total_range = newMaxYPos + newMaxYNeg
@@ -592,7 +605,20 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     plotRangeAnnotations.start = -botpts+annotation_depth
     plotRangeAnnotations.end = toppts
 
-    console.log(plotRangeAnnotations.start, plotRangeAnnotations.end)
+    console.log(figticker)
+
+    // Update the position of the reverse strand tickers
+    let tickerLocations = Array.from({length: 1000000 / tickFrequency}, (_, n) => n * tickFrequency);
+    const yaxisTicker = Array(...tickerLocations, ...tickerLocations.map(y => -y - AnnotationSpace));
+    figticker.ticker.ticks = yaxisTicker
+
+    // Update the labels of the reverse strand tickers
+    const ticker_labels = new Map();
+    for (let n of tickerLocations) {
+        ticker_labels.set(n, String(Math.round(n)));
+        ticker_labels.set(-n - AnnotationSpace, String(Math.round(n)));
+    }
+    figticker.major_label_overrides = ticker_labels
 
 """)
         curdoc().js_on_event(DocumentReady, max_y_js)
@@ -632,36 +658,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
             hide_short_CDSs_js_rev = CustomJS(args=dict(rectangles=rectangles_rev), code=js_string)
             curdoc().on_event(DocumentReady, hide_short_CDSs_js_rev)
 
-    # fix the Y axis tickers
-    ticker_locations = [n for n in range(0, 1000*1000, tick_frequency)]
-    fig.yaxis.ticker =   ticker_locations + [y*-1-room_on_graph_for_annotations for y in   ticker_locations]
-    ticker_labels = {n: str(n) for n in ticker_locations}
-    ticker_labels = {**ticker_labels, **{y*-1-room_on_graph_for_annotations: str(y) for y in ticker_locations}}
 
-    js_string = """
-    const ticker_locations = Array.from({length: 1000}, (_, i) => i * tick_frequency);
-figticker.ticker = [
-  ...ticker_locations,
-  ...ticker_locations.map(y => y * -1 - room_on_graph_for_annotations)
-];
-
-let ticker_labels = {};
-ticker_locations.forEach(n => {
-  ticker_labels[n] = String(n);
-});
-ticker_locations.forEach(y => {
-  ticker_labels[y * -1 - room_on_graph_for_annotations] = String(y);
-});
-    """
-
-    ticker_js = CustomJS(args=dict(figticker=fig.yaxis,
-                                   room_on_graph_for_annotations=room_on_graph_for_annotations,
-                                   tick_frequency=tick_frequency),
-                         code=js_string)
-    curdoc().on_event(DocumentReady, ticker_js)
-
-    # Round the labels to the nearest int
-    fig.yaxis.major_label_overrides = {k: str(abs(int(float(v)))) for k, v in ticker_labels.items()}
 
     # Build a DIV above the plot that contains the name of the plot and the total burden
     if cryptresult.name:
@@ -686,8 +683,6 @@ ticker_locations.forEach(y => {
     #layout = column(layout, widgets, styles={'margin': '0 auto', 'align-items': 'center'})
     layout = column(name_div, burden_div, layout, widgets, styles={'margin': '0 auto', 'align-items': 'center'})
     layout.sizing_mode = 'scale_width'
-
-        # Set up Y axis ticks
 
     # Add the tables
     if tables:
