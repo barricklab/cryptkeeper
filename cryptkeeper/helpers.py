@@ -8,6 +8,22 @@ import math
 from functools import wraps
 from pathlib import Path
 
+
+class FakeLogger:
+    """An empty logger that does nothing to prevent cryptkeeper from crashing"""
+    def __init__(self):
+        pass
+    def info(self, message):
+        pass
+    def debug(self, message):
+        pass
+    def warning(self, message):
+        pass
+    def error(self, message):
+        pass
+    def critical(self, message):
+        pass
+
 def timer(func) -> callable:
     """ A timer decorator """
     def wrapper(*args, **kwargs):

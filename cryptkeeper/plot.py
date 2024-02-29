@@ -11,7 +11,7 @@ from bokeh.transform import linear_cmap
 from bokeh.palettes import viridis
 from bokeh.layouts import column, row
 from bokeh.events import DocumentReady
-from bokeh.io import curdoc
+from bokeh.io import curdoc, export_png, export_svg
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, Range1d, HoverTool, LinearAxis, TextInput, CustomJS, Div
 from bokeh.embed import components
@@ -19,6 +19,9 @@ from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.core.validation import silence
 from bokeh.core.validation.warnings import MISSING_RENDERERS
 
+import logging
+
+logging.getLogger("bokeh.io.export").setLevel(logging.CRITICAL)
 
 ANNOTATION_SPACE = 25  # In percent of the graph
 GLYPH_SCALING = 1.2
@@ -136,7 +139,7 @@ def plot_boxes(features_list):
     return bokah_orfs, highest_burden
 
 
-def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
+def make_plot(cryptresult, tick_frequency=1000, filename=None):
     view_format = "mirrored"
     # Set up plot
 
@@ -146,7 +149,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     # Set up the figure
     fig = figure(width=1500, height=750,)
     fig.xaxis.axis_label = "Position"
-    fig.yaxis.axis_label = "Expression"
+    fig.yaxis.axis_label = "Predicted Expression"
     fig.yaxis.visible = False
     fig.ygrid.visible = False
     fig.xgrid.visible = False
@@ -156,10 +159,10 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     wigits = []
     tables = {}
 
-    fig.extra_y_ranges = {"y_range2": Range1d(start=0, end=0),
-                          "y_range3": Range1d(start=0, end=0),
-                          "y_range4": Range1d(start=0, end=0),}
-    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Expression")
+    fig.extra_y_ranges = {"y_range2": Range1d(start=-1, end=1),
+                          "y_range3": Range1d(start=-1, end=1),
+                          "y_range4": Range1d(start=-1, end=1),}
+    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Predicted Expression")
     fig.add_layout(shownaxis, 'left')
 
     fig.extra_x_ranges = {"x_range2": Range1d(start=0, end=annotation_scale_range),
@@ -182,7 +185,6 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
     fig.yaxis.major_label_text_font = FONT
     shownaxis.major_label_text_font = FONT
 
-
     # set width to length of sequence
     fig.x_range = Range1d(start=0, end=len(cryptresult.sequence))
 
@@ -199,6 +201,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
 
     # Draw a line for the top of the annotations
     fig.line([0, annotation_scale_range], [0, 0], line_width=2, color="black", y_range_name="y_range2", x_range_name="x_range2")
+
 
     reverse_height = None
     forward_height = None
@@ -287,6 +290,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         fig.line([0, annotation_scale_range], [reverse_height-1000, reverse_height-1000], line_width=2, color="black", y_range_name="y_range2", x_range_name="x_range2")
         annotation_depth = reverse_height-1000
 
+
     # add promoters
     promoters = cryptresult.promoters
     if promoters:
@@ -333,6 +337,7 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
                             promoter_glyphs.data_source.change.emit()
                             """
         promoter_javascript = CustomJS(args=dict(promoter_glyphs=promoter_glyphs, promoter_number=promoter_number, source=promoter_dict), code=promoter_javascript)
+        
         curdoc().js_on_event(DocumentReady, promoter_javascript)
         wigits.append((promoter_number, promoter_javascript))
 
@@ -673,6 +678,9 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
         wigit.js_on_change('value', js)
         widgets_to_add.append(wigit)
 
+    # Specify we want the svg backend
+    fig.output_backend = 'svg'
+
     # Add the plot to the document and add a title
     widgets = row(*widgets_to_add, styles={'margin': '0 auto', 'align-items': 'center'})
     if color_bar_figure:
@@ -710,12 +718,16 @@ def export_bokeh(cryptresult, tick_frequency=1000, filename=None):
 
     if filename:
         script, fig = components(layout)
-        export_html(script, fig, filename)
+        export_html(script, fig, filename + "_graph.html")
         # copy the assets folder to the output folder if it doesn't exist
         if os.path.exists(os.path.join(os.path.dirname(filename), "assets")):
             shutil.rmtree(os.path.join(os.path.dirname(filename), "assets"))
         shutil.copytree(os.path.join(os.path.dirname(__file__), "assets"), os.path.join(os.path.dirname(filename), "assets"))
+        for widget, js in wigits:
+            widget.visible = False
+        export_svg(layout, filename=filename + "_graph.svg")
         return filename
+
 
     return fig
 

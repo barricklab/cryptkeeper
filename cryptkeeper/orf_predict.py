@@ -17,67 +17,65 @@ import csv
 from math import floor
 
 def find_orfs(seq, translation_table_id, minimum_orf_aa_length):
-  orfs = []
+    orfs = []
 
-  if type(seq) == str:
-      for this_seq in SeqIO.parse(seq, "fasta"):
-          seq = this_seq.upper()
-          break
+    if type(seq) == str:
+        for this_seq in SeqIO.parse(seq, "fasta"):
+            seq = this_seq.upper()
+            break
 
-  seq_len = len(seq)
+    #Get the codon table so we know the valid start codons
+    translation_table = Bio.Data.CodonTable.unambiguous_dna_by_id[translation_table_id]
 
-  #Get the codon table so we know the valid start codons
-  translation_table = Bio.Data.CodonTable.unambiguous_dna_by_id[translation_table_id]
-
-  #ignore ultra-rare "UUG" "GUG" start codons (which are not recognized by RBS Calculator)
-  if (translation_table_id==11):
-    translation_table.start_codons = ['ATG', 'GTG', 'TTG']
+    #ignore ultra-rare "UUG" "GUG" start codons (which are not recognized by RBS Calculator)
+    if (translation_table_id==11):
+        translation_table.start_codons = ['ATG', 'GTG', 'TTG']
 
   #print(translation_table.start_codons)
 
-  for this_strand, this_seq in [('+', seq), ('-', seq.reverse_complement())]:
-    for start_pos_0 in range(len(this_seq)- 2):
+    for this_strand, this_seq in [('+', seq), ('-', seq.reverse_complement())]:
+        for start_pos_0 in range(len(this_seq)- 2):
 
-      #print(this_seq[start_pos_0:start_pos_0+3].seq)
+          #print(this_seq[start_pos_0:start_pos_0+3].seq)
 
-      #Is this a start codon?
-      this_start_codon = this_seq[start_pos_0:start_pos_0+3].seq
-      if (this_start_codon not in translation_table.start_codons):
-        continue
+          #Is this a start codon?
+            this_start_codon = this_seq[start_pos_0:start_pos_0+3].seq
+            if (this_start_codon not in translation_table.start_codons):
+                continue
 
-      start_pos_1 = start_pos_0+1
+            start_pos_1 = start_pos_0+1
 
-      #print(this_seq[start_pos_0:])
+          #print(this_seq[start_pos_0:])
 
-      #remove bases to make a multiple of three to avoid BioPython warnings
-      end_pos_1 = start_pos_0+floor(float(len(this_seq)-start_pos_0)/3.0)*3
+          #remove bases to make a multiple of three to avoid BioPython warnings
+            end_pos_1 = start_pos_0+floor(float(len(this_seq)-start_pos_0)/3.0)*3
 
-      aa_sequence = this_seq[start_pos_0:end_pos_1].seq.translate(translation_table, to_stop=True)
-      aa_length = len(aa_sequence)
+            aa_sequence = this_seq[start_pos_0:end_pos_1].seq.translate(translation_table, to_stop=True)
+            aa_length = len(aa_sequence)
 
-      end_pos_1 = start_pos_1 + aa_length*3 - 1
+            end_pos_1 = start_pos_1 + aa_length*3 - 1
 
-      #Is it a long enough reading frame?
-      if aa_length < minimum_orf_aa_length:
-        continue
+          #Is it a long enough reading frame?
+            if aa_length < minimum_orf_aa_length:
+                continue
 
-      #print(str(this_strand) + " " + str(start_pos_0))
+          #print(str(this_strand) + " " + str(start_pos_0))
 
-      if (this_strand == '-'):
-        start_pos_1 = len(this_seq) - start_pos_1 + 1
-        end_pos_1 = len(this_seq) - end_pos_1 + 1
+            if (this_strand == '-'):
+                start_pos_1 = len(this_seq) - start_pos_1 + 1
+                end_pos_1 = len(this_seq) - end_pos_1 + 1
 
-      orfs.append(dict(
-        start = start_pos_1,
-        end = end_pos_1,
-        strand = this_strand,
-        start_codon = this_start_codon,
-        length = aa_length,
-        translation = aa_sequence
-        ))
+            orfs.append(dict(
+              start = start_pos_1,
+              end = end_pos_1,
+              strand = this_strand,
+              start_codon = this_start_codon,
+              length = aa_length,
+              translation = aa_sequence
+              ))
 
-  orfs = sorted(orfs, key=itemgetter('start'))
-  return orfs
+    orfs = sorted(orfs, key=itemgetter('start'))
+    return orfs
 
 
 def main(options):

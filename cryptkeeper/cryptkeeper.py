@@ -17,16 +17,14 @@ from collections import namedtuple
 from operator import itemgetter
 from copy import deepcopy
 from collections import namedtuple
-from Bio import SeqIO
+from Bio import SeqIO, SeqRecord
 from rhotermpredict import rho_term_predict
 from .orf_predict import orf_predict, find_orfs
 from .dependency_wrappers import ostir, transterm, promocalc
-from .export import CryptResults, plot, to_csv, to_summary
-from .export_bokeh import export_bokeh
+from .export import CryptResults, to_csv, to_summary
+from .plot import make_plot
 from .constants import COLORS
-from .helpers import delay_iterator
-import webbrowser
-
+from .helpers import delay_iterator, FakeLogger
 def main() -> None:
     """CLI Entry Point for Cryptkeeper"""
 
@@ -93,16 +91,10 @@ def main() -> None:
         type=int,
         help="Y axis tick frequency (default 1000)",
     )
-    parser.add_argument(
-        '--matplotlib',
-        action='store_true',
-        dest='matplotlib',
-        default=False,
-        help="Use MatPlotLib visualization (deprecated)",
-    )
-
     # Parse the command line arguments
     options = parser.parse_args()
+
+    logger = make_logger(options.o)
 
     # Call the cryptkeeper function with the provided options
     result = cryptkeeper(input_file=options.i,
@@ -110,7 +102,11 @@ def main() -> None:
                         circular=options.circular,
                         name=options.name,
                         threads=options.j,
+                        logger=logger,
                         rbs_score_cutoff=options.rbs_score_cutoff)
+
+    # Notify the user that we're building graphs
+    logger.info("Exporting data")
 
     # Perform additional operations on the result
     to_csv(result, options.o)
@@ -119,17 +115,35 @@ def main() -> None:
 
     # Print a message indicating that the analysis is finished
     # Plot the result using the selected visualization method
-    if options.matplotlib:
-        DeprecationWarning('Matplotlib base plotting will be replaced with bokah soon')
-        plot(result, options.o + "_graph.html")
-    else:
-        plot_filepath = export_bokeh(result, tick_frequency=options.tick_frequency, filename=options.o + "_graph.html")
-        webbrowser.open(plot_filepath)
+    plot_filepath = make_plot(result, tick_frequency=options.tick_frequency, filename=options.o)
 
     # Print a message indicating that the process is done
+    logger.info("Cryptkeeper finished")
 
+    return
 
-def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, rbs_score_cutoff=2.0):
+def make_logger(output=None):
+    # Set up log
+    logger = logging.getLogger('cryptkeeper')
+    logger.setLevel(logging.DEBUG)
+
+    stream_formatter = logging.Formatter('[%(asctime)s] Cryptkeeper: %(message)s')
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(stream_formatter)
+    if not logger. hasHandlers():
+        logger.addHandler(stream_handler)
+
+    if output:
+        output_path = os.path.abspath(output)
+        file_formatter = logging.Formatter('[%(asctime)s - %(levelname)s] Cryptkeeper: %(message)s')
+        file_handler = logging.FileHandler(filename=f"{output_path}.log")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+    return logger
+
+def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, logger=None, rbs_score_cutoff=2.0):
     """Predict cryptic bacterial gene expression signals in an input sequence."""
 
     # @TODO: Many of these steps should be moved to a function
@@ -163,24 +177,9 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
         outdir = tempfile.TemporaryDirectory()
         output_path = outdir.name
 
-
-    # Set up log
-    logger = logging.getLogger('cryptkeeper')
-    logger.setLevel(logging.DEBUG)
-
-    stream_formatter = logging.Formatter('[%(asctime)s] Cryptkeeper: %(message)s')
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
-    stream_handler.setFormatter(stream_formatter)
-    if not logger. hasHandlers():
-        logger.addHandler(stream_handler)
-
-    if output:
-        file_formatter = logging.Formatter('[%(asctime)s - %(levelname)s] Cryptkeeper: %(message)s')
-        file_handler = logging.FileHandler(filename=f"{output_path}.log")
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
+    # Set up logger
+    if not logger:
+        logger = FakeLogger()
 
     # Convert non-FASTA files to FASTA (supports Genbank) - This is necessary to run TransTermHP
     if input_file_type != "fasta" and input_file_type != "fna":
@@ -248,7 +247,6 @@ def cryptkeeper(input_file, output=None, circular=False, name=None, threads=1, r
                     if not start:
                         found_stops[i] = -1
                         found_starts[i] = True
-
 
             if junction[0:3] in stop_codons:
                 found_stops[0] = -1
