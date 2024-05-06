@@ -152,7 +152,7 @@ def make_logger(output=None):
         )
         # Make the file if it doesnt exist
         if not os.path.isfile(f"{output_path}.log"):
-            open(f"{output_path}.log", "w").close()
+            os.makedirs(os.path.dirname(f"{output_path}.log"), exist_ok=True)
         file_handler = logging.FileHandler(filename=f"{output_path}.log")
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(file_formatter)
@@ -451,6 +451,8 @@ def cryptkeeper(
         if i > 1:
             exit()
         main_seq = this_seq.upper()
+    if not main_seq:
+        exit()
 
     # ------------------------------------------------------------------------------
     # PERFORM TERMINATOR PREDICTIONS
