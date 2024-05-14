@@ -1,0 +1,6 @@
+CryptKeeper Results Summary
+Total Burden: 7889365.6451999955
+Predicted Promoters: 5672
+Predicted Translation: 163
+Predicted Rho Independent Terminators: 12
+Total Rho Dependent Terminators: 14
