@@ -7,7 +7,10 @@ dependencies:
   - ostir
   - transtermhp
   - pip
+  - firefox
+  - geckodriver
   - pip:
     - rhotermpredict
     - promotercalculator
-    - plotly
+    - selenium
+    - bokeh
