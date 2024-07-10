@@ -81,6 +81,9 @@ def plot_boxes(features_list):
         to_add = 0
         failed = True
 
+        start_y = 0
+        stop_y = 0 + expression
+
         while failed:
             start_y = to_add
             stop_y = to_add + expression
@@ -275,9 +278,9 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         annotation_depth = -500
     # Now we add the annotations so we know how much space it takes
 
+    lowest_annotation_y = copy.copy(annotation_depth) - 500
     if cryptresult.annotations:
         # annotation_depth -= 500
-        lowest_annotation_y = copy.copy(annotation_depth) - 500
         genbank_dictionary = {
             "x": [],
             "y": [],

@@ -29,7 +29,9 @@ def main() -> None:
     """CLI Entry Point for Cryptkeeper"""
 
     # Create the argument parser
-    parser = argparse.ArgumentParser(description="input fasta")
+    parser = argparse.ArgumentParser(
+        description="Pipeline for predicting cryptic gene expression"
+    )
 
     # Define the command line arguments
     parser.add_argument(
@@ -46,7 +48,7 @@ def main() -> None:
         "--circular",
         action="store_true",
         dest="circular",
-        help="The input file is circular. (Note: Increases runtime by 3x)",
+        help="The input file is circular. (Note: Increases runtime)",
     )
     parser.add_argument(
         "-o",
@@ -123,9 +125,7 @@ def main() -> None:
 
     # Print a message indicating that the analysis is finished
     # Plot the result using the selected visualization method
-    _ = make_plot(
-        result, tick_frequency=options.tick_frequency, filename=options.o
-    )
+    _ = make_plot(result, tick_frequency=options.tick_frequency, filename=options.o)
 
     # Print a message indicating that the process is done
     logger.info("Cryptkeeper finished")
