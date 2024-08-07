@@ -1,8 +1,6 @@
-LOCUS       JEB1207                 2837 bp ds-DNA     circular     30-JAN-2024
+LOCUS       pSB1C3-K3174006                 2837 bp ds-DNA     circular     30-JAN-2024
 DEFINITION  .
-COMMENT     Imported using the Genbank importer. File name: JEB1207.gbk
-            Imported using the Genbank importer. File name: JEB1207.gbk
-            Imported using the Genbank importer. File name: pSB1C3.gb
+COMMENT     Biobrick K3174006 in pSB1C3
 FEATURES             Location/Qualifiers
      terminator       22..93
                      /label="E. coli his operon terminator"
