@@ -10,14 +10,13 @@ setup(
         "ostir",
         "rhotermpredict",
         "promotercalculator",
-        "selenium",
         "bokeh",
     ],
     # metadata to display on PyPI
     author="Barrick Lab",
     author_email="jbarrick@cm.utexas.edu",
     description="Package for predicting functional components of DNA sequences",
-    keywords="DNA, RNA, Cryptkeeper, Barrick, RBS, Biology, Bio",
+    keywords="DNA, RNA, CryptKeeper, Barrick, RBS, Biology, Bio",
     url="https://github.com/barricklab/cryptkeeper",  # project home page, if any
     project_urls={
         "Bug Tracker": "https://github.com/barricklab/cryptkeeper/issues",

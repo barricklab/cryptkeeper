@@ -104,7 +104,16 @@ def main() -> None:
         action="store_true",
         dest="no_vis",
         required=False,
+        default=False,
         help="Skip visualization",
+    )
+    parser.add_argument(
+        "--show-small",
+        action="store_true",
+        dest="show_small",
+        required=False,
+        default=False,
+        help="Show small ORFs on visualization",
     )
     # Parse the command line arguments
     options = parser.parse_args()
@@ -133,7 +142,11 @@ def main() -> None:
     # Print a message indicating that the analysis is finished
     # Plot the result using the selected visualization method
     if not options.no_vis:
-        _ = make_plot(result, tick_frequency=options.tick_frequency, filename=options.o)
+        if options.show_small:
+            show_small = options.show_small
+        else:
+            show_small = False
+        _ = make_plot(result, tick_frequency=options.tick_frequency, filename=options.o, show_small=show_small)
 
     # Print a message indicating that the process is done
     logger.info("Cryptkeeper finished")
@@ -501,14 +514,14 @@ def cryptkeeper(
             )
         )
 
-    logger.info("Running RIT_predict_TransTerm")
+    logger.info("Running TransTerm")
     transterm_predictions = transterm(input_file_name, circular_length)
     # ------------------------------------------------------------------------------
     # PERFORM PROMOTER PREDICTION
     # ------------------------------------------------------------------------------
 
     # Predict promoters
-    logger.info("Running TSS_predict_promoter_calculator")
+    logger.info("Running Promoter Calculator")
     promoter_calc_predictions = promocalc(
         main_seq, circular_length=circular_length, threads=threads
     )
@@ -656,7 +669,7 @@ def cryptkeeper(
         sequence=str(single_sequence),
         translation_sites=expressed_orfs,
         rho_dep_terminators=rhotermpredict_results,
-        rho_ind_terminators=transterm_predictions,
+        int_terminators=transterm_predictions,
         promoters=promoter_calc_predictions,
         annotations=features_list,
         burden=total_burden,

@@ -21,6 +21,12 @@ from bokeh.models import (
     TextInput,
     CustomJS,
     Div,
+    ResetTool,
+    WheelZoomTool,
+    PanTool,
+    BoxZoomTool,
+    SaveTool
+
 )
 from bokeh.embed import components
 from bokeh.models.widgets import DataTable, TableColumn
@@ -166,7 +172,7 @@ def plot_boxes(features_list):
     return bokah_orfs, highest_burden
 
 
-def make_plot(cryptresult, tick_frequency=1000, filename=None):
+def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False):
     view_format = "mirrored"
     # Set up plot
 
@@ -177,7 +183,13 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
     fig = figure(
         width=1500,
         height=750,
+        tools = [ResetTool(),
+                WheelZoomTool(),
+                PanTool(),
+                BoxZoomTool(),
+                SaveTool()]
     )
+
     fig.xaxis.axis_label = "Position"
     fig.yaxis.axis_label = "Predicted Translation"
     fig.yaxis.visible = False
@@ -226,7 +238,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
     reverse_exists = False
     for feature in (
         cryptresult.rho_dep_terminators
-        + cryptresult.rho_ind_terminators
+        + cryptresult.int_terminators
         + cryptresult.promoters
     ):
         if feature.strand == "+" and not forward_exists:
@@ -378,21 +390,21 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             y_range_name="y_range2",
         )
         genbank_glyphs_hover = HoverTool(
-            renderers=[genbank_glyphs], tooltips=[("Name", "@name")]
+            renderers=[genbank_glyphs], tooltips=[("Type", "Annotation"),("Name", "@name")], visible=False
         )
         fig.add_tools(genbank_glyphs_hover)
 
         # Draw a line below the annotations
 
-        lowest_annotation_y -= 500
-        fig.line(
-            [0, annotation_scale_range],
-            [lowest_annotation_y, lowest_annotation_y],
-            line_width=2,
-            color="black",
-            y_range_name="y_range2",
-        )
-        annotation_depth = lowest_annotation_y
+    lowest_annotation_y -= 500
+    fig.line(
+        [0, annotation_scale_range],
+        [lowest_annotation_y, lowest_annotation_y],
+        line_width=2,
+        color="black",
+        y_range_name="y_range2",
+    )
+    annotation_depth = lowest_annotation_y
 
     if view_format == "mirrored" and reverse_exists:
         # We add the track for reverse strand annotations
@@ -464,7 +476,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
                 ("Position", "@position"),
                 ("Strand", "@strand"),
                 ("Score", "@score"),
-            ],
+            ], visible=False
         )
         fig.add_tools(promoter_glyphs_hover)
 
@@ -493,6 +505,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         )
 
         curdoc().js_on_event(DocumentReady, promoter_javascript)
+        fig.js_on_event('reset',promoter_javascript)
         wigits.append((promoter_number, promoter_javascript))
 
         # Add table
@@ -502,7 +515,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
 
     # Add the terminators
     rdpt = cryptresult.rho_dep_terminators
-    ridpt = cryptresult.rho_ind_terminators
+    ridpt = cryptresult.int_terminators
 
     if rdpt:
         rdpt = sorted(rdpt, key=lambda x: x.score, reverse=True)
@@ -564,10 +577,11 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         terminator_glyphs_hover = HoverTool(
             renderers=[terminator_glyphs],
             tooltips=[
+                ("Type", "Rho-dependent Terminator"),
                 ("Position", "@position"),
                 ("Strand", "@strand"),
                 ("Score", "@score"),
-            ],
+            ], visible=False
         )
         fig.add_tools(terminator_glyphs_hover)
 
@@ -594,10 +608,11 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             code=rdpt_javascript,
         )
         curdoc().js_on_event(DocumentReady, rdpt_javascript)
+        fig.js_on_event('reset',rdpt_javascript)
         wigits.append((rdpt_number, rdpt_javascript))
 
         # Add table
-        name = "Rho-Dependant Terminators"
+        name = "Rho-Dependent Terminators"
         rdpt_table = generate_bokeh_table(rdpt, name)
         tables[name] = rdpt_table
 
@@ -651,16 +666,17 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         terminator_glyphs_hover = HoverTool(
             renderers=[terminator_glyphs],
             tooltips=[
+                ("Type", "Intrinsic Terminator"),
                 ("Position", "@position"),
                 ("Strand", "@strand"),
                 ("Score", "@score"),
-            ],
+            ], visible=False
         )
         fig.add_tools(terminator_glyphs_hover)
 
         # Add a widget to change the number of terminators shown
         ridpt_number = TextInput(
-            title="Number of Rho-Independant Terminators", value=str(number_of_glyphs)
+            title="Number of Intrinsic Terminators", value=str(number_of_glyphs)
         )
         ridpt_javascript = """
                         var originalRIDPTData = structuredClone(source)
@@ -681,10 +697,11 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             code=ridpt_javascript,
         )
         curdoc().js_on_event(DocumentReady, ridpt_javascript)
+        fig.js_on_event('reset',ridpt_javascript)
         wigits.append((ridpt_number, ridpt_javascript))
 
         # Add table
-        name = "Rho-Independant Terminators"
+        name = "Intrinsic Terminators"
         ridpt_table = generate_bokeh_table(ridpt, name)
         tables[name] = ridpt_table
 
@@ -780,11 +797,12 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             rectangles_fwd_hover = HoverTool(
                 renderers=[rectangles_fwd],
                 tooltips=[
+                    ("Type", "Translation"),
                     ("Position", "@position"),
                     ("Strand", "@strand"),
                     ("RBS Strength", "@rbs_strength"),
                     ("Burden", "@burden"),
-                ],
+                ], visible=False
             )
             fig.add_tools(rectangles_fwd_hover)
         if reverse_exists:
@@ -804,11 +822,12 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             rectangles_rev_hover = HoverTool(
                 renderers=[rectangles_rev],
                 tooltips=[
+                    ("Type", "Translation"),
                     ("Position", "@position"),
                     ("Strand", "@strand"),
                     ("RBS Strength", "@rbs_strength"),
                     ("Burden", "@burden"),
-                ],
+                ], visible=False
             )
             fig.add_tools(rectangles_rev_hover)
 
@@ -925,6 +944,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
 """,
         )
         curdoc().js_on_event(DocumentReady, max_y_js)
+        fig.js_on_event('reset',max_y_js)
+
         wigits.append((max_y_pos, max_y_js))
         wigits.append((max_y_neg, max_y_js))
 
@@ -944,28 +965,31 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         expressed_CDSs_table = generate_bokeh_table(expressed_CDSs, name)
         tables[name] = expressed_CDSs_table
 
-        # Javascript to hide CDSs less than 45 bases
-        js_string = """
-    var newMin = 45
-    rectangles.visible = true
-    for (var i = 0; i < rectangles.data_source.data['w'].length; i++) {
-        if (rectangles.data_source.data['w'][i] < newMin) {
-            rectangles.data_source.data['w'][i] = 0
-            rectangles.data_source.data['h'][i] = 0
+        if not show_small:
+            # Javascript to hide CDSs less than 45 bases
+            js_string = """
+        var newMin = 45
+        rectangles.visible = true
+        for (var i = 0; i < rectangles.data_source.data['w'].length; i++) {
+            if (rectangles.data_source.data['w'][i] < newMin) {
+                rectangles.data_source.data['w'][i] = 0
+                rectangles.data_source.data['h'][i] = 0
+            }
         }
-    }
-    rectangles.data_source.change.emit()
-"""
-        if forward_exists:
-            hide_short_CDSs_js_fwd = CustomJS(
-                args=dict(rectangles=rectangles_fwd), code=js_string
-            )
-            curdoc().on_event(DocumentReady, hide_short_CDSs_js_fwd)
-        if reverse_exists:
-            hide_short_CDSs_js_rev = CustomJS(
-                args=dict(rectangles=rectangles_rev), code=js_string
-            )
-            curdoc().on_event(DocumentReady, hide_short_CDSs_js_rev)
+        rectangles.data_source.change.emit()
+    """
+            if forward_exists:
+                hide_short_CDSs_js_fwd = CustomJS(
+                    args=dict(rectangles=rectangles_fwd), code=js_string
+                )
+                curdoc().on_event(DocumentReady, hide_short_CDSs_js_fwd)
+                fig.js_on_event('reset',hide_short_CDSs_js_fwd)
+            if reverse_exists:
+                hide_short_CDSs_js_rev = CustomJS(
+                    args=dict(rectangles=rectangles_rev), code=js_string
+                )
+                curdoc().on_event(DocumentReady, hide_short_CDSs_js_rev)
+                fig.js_on_event('reset',hide_short_CDSs_js_rev)
 
     # Build a DIV above the plot that contains the name of the plot and the total burden
     if cryptresult.name:
@@ -1056,7 +1080,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         )
         for widget, js in wigits:
             widget.visible = False
-        export_svg(layout, filename=filename + "_graph.svg")
         return filename
 
     return fig

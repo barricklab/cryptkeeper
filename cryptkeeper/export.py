@@ -19,7 +19,7 @@ class CryptResults:
     sequence: str
     translation_sites: List[NamedTuple]
     rho_dep_terminators: List[NamedTuple]
-    rho_ind_terminators: List[NamedTuple]
+    int_terminators: List[NamedTuple]
     promoters: List[NamedTuple]
     annotations: List[NamedTuple]
     burden: float
@@ -60,7 +60,7 @@ def to_csv(results: CryptResults, output_path: str):
     # Rho Independent Termination to CSV
     # Headers: Start, end, strand, coef, hairpin score, tail score
     # old system also has hairpin upstream, open, loop, close, and tail
-    dataset = results.rho_ind_terminators
+    dataset = results.int_terminators
     writepath = output_path + "_rit.csv"
     _csv_writer()
 
@@ -87,7 +87,7 @@ def to_summary(results: CryptResults, output_path: str):
         )
         file.write(
             "Predicted Rho Independent Terminators: "
-            + str(len(results.rho_ind_terminators))
+            + str(len(results.int_terminators))
             + "\n"
         )
         file.write(
@@ -142,8 +142,8 @@ def from_json(input_path: str) -> CryptResults:
         results.translation_sites[i] = expressed_orf(*hit)
     for i, hit in enumerate(results.promoters):
         results.promoters[i] = promocalc_hit(*hit)
-    for i, hit in enumerate(results.rho_ind_terminators):
-        results.rho_ind_terminators[i] = transterm_hit(*hit)
+    for i, hit in enumerate(results.int_terminators):
+        results.int_terminators[i] = transterm_hit(*hit)
     for i, hit in enumerate(results.rho_dep_terminators):
         results.rho_dep_terminators[i] = rtp_hit(*hit)
     for i, hit in enumerate(results.annotations):
