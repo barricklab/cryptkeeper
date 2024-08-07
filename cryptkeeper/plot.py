@@ -25,8 +25,8 @@ from bokeh.models import (
     WheelZoomTool,
     PanTool,
     BoxZoomTool,
-    SaveTool
-
+    SaveTool,
+    NumberFormatter
 )
 from bokeh.embed import components
 from bokeh.models.widgets import DataTable, TableColumn
@@ -183,11 +183,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
     fig = figure(
         width=1500,
         height=750,
-        tools = [ResetTool(),
-                WheelZoomTool(),
-                PanTool(),
-                BoxZoomTool(),
-                SaveTool()]
+        tools=[ResetTool(), WheelZoomTool(), PanTool(), BoxZoomTool(), SaveTool()],
     )
 
     fig.xaxis.axis_label = "Position"
@@ -390,7 +386,9 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             y_range_name="y_range2",
         )
         genbank_glyphs_hover = HoverTool(
-            renderers=[genbank_glyphs], tooltips=[("Type", "Annotation"),("Name", "@name")], visible=False
+            renderers=[genbank_glyphs],
+            tooltips=[("Type", "Annotation"), ("Name", "@name")],
+            visible=False,
         )
         fig.add_tools(genbank_glyphs_hover)
 
@@ -476,7 +474,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
                 ("Position", "@position"),
                 ("Strand", "@strand"),
                 ("Score", "@score"),
-            ], visible=False
+            ],
+            visible=False,
         )
         fig.add_tools(promoter_glyphs_hover)
 
@@ -505,7 +504,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         )
 
         curdoc().js_on_event(DocumentReady, promoter_javascript)
-        fig.js_on_event('reset',promoter_javascript)
+        fig.js_on_event("reset", promoter_javascript)
         wigits.append((promoter_number, promoter_javascript))
 
         # Add table
@@ -581,7 +580,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
                 ("Position", "@position"),
                 ("Strand", "@strand"),
                 ("Score", "@score"),
-            ], visible=False
+            ],
+            visible=False,
         )
         fig.add_tools(terminator_glyphs_hover)
 
@@ -608,7 +608,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             code=rdpt_javascript,
         )
         curdoc().js_on_event(DocumentReady, rdpt_javascript)
-        fig.js_on_event('reset',rdpt_javascript)
+        fig.js_on_event("reset", rdpt_javascript)
         wigits.append((rdpt_number, rdpt_javascript))
 
         # Add table
@@ -670,7 +670,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
                 ("Position", "@position"),
                 ("Strand", "@strand"),
                 ("Score", "@score"),
-            ], visible=False
+            ],
+            visible=False,
         )
         fig.add_tools(terminator_glyphs_hover)
 
@@ -697,7 +698,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             code=ridpt_javascript,
         )
         curdoc().js_on_event(DocumentReady, ridpt_javascript)
-        fig.js_on_event('reset',ridpt_javascript)
+        fig.js_on_event("reset", ridpt_javascript)
         wigits.append((ridpt_number, ridpt_javascript))
 
         # Add table
@@ -802,7 +803,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
                     ("Strand", "@strand"),
                     ("RBS Strength", "@rbs_strength"),
                     ("Burden", "@burden"),
-                ], visible=False
+                ],
+                visible=False,
             )
             fig.add_tools(rectangles_fwd_hover)
         if reverse_exists:
@@ -827,7 +829,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
                     ("Strand", "@strand"),
                     ("RBS Strength", "@rbs_strength"),
                     ("Burden", "@burden"),
-                ], visible=False
+                ],
+                visible=False,
             )
             fig.add_tools(rectangles_rev_hover)
 
@@ -866,8 +869,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         color_bar.major_label_text_font_size = FONTSIZE
         silence(warning=MISSING_RENDERERS)
 
-        max_y_pos = TextInput(title="Max Y (Top track)", value=str(highest_y_pos))
-        max_y_neg = TextInput(title="Max Y (Bottom track)", value=str(highest_y_neg))
+        max_y_pos = TextInput(title="Max Y (Top track)", value=str(math.ceil(highest_y_pos)))
+        max_y_neg = TextInput(title="Max Y (Bottom track)", value=str(math.ceil(highest_y_neg)))
 
         # fix the Y axis tickers
         ticker_locations = [n for n in range(0, 1000 * 1000, tick_frequency)]
@@ -944,12 +947,12 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
 """,
         )
         curdoc().js_on_event(DocumentReady, max_y_js)
-        fig.js_on_event('reset',max_y_js)
+        fig.js_on_event("reset", max_y_js)
 
         wigits.append((max_y_pos, max_y_js))
         wigits.append((max_y_neg, max_y_js))
 
-        max_burden = TextInput(title="Max burden", value=str(highest_tir))
+        max_burden = TextInput(title="Max burden", value=str(math.ceil(highest_tir)))
         max_burden_js = CustomJS(
             args=dict(color_bar=color_bar),
             code="""
@@ -983,13 +986,13 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
                     args=dict(rectangles=rectangles_fwd), code=js_string
                 )
                 curdoc().on_event(DocumentReady, hide_short_CDSs_js_fwd)
-                fig.js_on_event('reset',hide_short_CDSs_js_fwd)
+                fig.js_on_event("reset", hide_short_CDSs_js_fwd)
             if reverse_exists:
                 hide_short_CDSs_js_rev = CustomJS(
                     args=dict(rectangles=rectangles_rev), code=js_string
                 )
                 curdoc().on_event(DocumentReady, hide_short_CDSs_js_rev)
-                fig.js_on_event('reset',hide_short_CDSs_js_rev)
+                fig.js_on_event("reset", hide_short_CDSs_js_rev)
 
     # Build a DIV above the plot that contains the name of the plot and the total burden
     if cryptresult.name:
@@ -1094,10 +1097,20 @@ def generate_bokeh_table(datalist, name) -> DataTable:
         for column_name in column_names:
             data[column_name].append(getattr(datarow, column_name))
     source = ColumnDataSource(data)
-    columns = [
-        TableColumn(field=column_name, title=column_name)
-        for column_name in column_names
-    ]
+
+    columns = []
+    for column_name in column_names:
+            if column_name in ["score", "c_over_g", "tail_score", "burden", "dG"]:
+                formatted_column = TableColumn(
+                    field=column_name,
+                    title=column_name,
+                    formatter=NumberFormatter(format = "‘0,0.0’", rounding="round"),
+                )
+            else:
+                formatted_column = TableColumn(field=column_name, title=column_name)
+            columns.append(formatted_column)
+
+
     name_div = Div(text=f"<h1>{name}</h1>")
     table = DataTable(
         source=source, columns=columns, name=table_name, width=1500, editable=True
