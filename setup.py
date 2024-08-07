@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cryptkeeper",
-    version="0.1",
+    version="1.0.0",
     packages=find_packages(include=["cryptkeeper"]),
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
