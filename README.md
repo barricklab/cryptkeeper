@@ -5,7 +5,7 @@
 CryptKeeper is a computational pipeline designed to predict the presence of open reading frames that are burdensome due to substantial ribosome sequestration on plasmids, particularly virus infectious clones. CryptKeeper also uses other prediction tools, such as promoter prediction and terminator prediction, to provide additional context. Burden from strongly expressed, long open reading frames have been found to render plasmids evolutionarily unstable or unclonable. In addition to highlighting burden from ribosome absorption, we've also found that CryptKeeper is capable of displaying alternative translation initiation sites that lead to protein truncations. This is an important consideration for experiments that rely on protein fusions or tagging.
 
 
-CryptKeeper provides an output in the form of CSV files (for downstream data processing), an SVG of the resulting graph, and a Bokeh plot for interactive visualization.
+CryptKeeper provides an output in the form of CSV files (for downstream data processing) and a Bokeh plot for interactive visualization. The Bokeh plot uses the SVG backend and can be saved to support assembling downstream figures.
 
 
 ![Example CryptKeeper output of a medium strength BFP expression plasmid.](./examples/output.png)
