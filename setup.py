@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cryptkeeper",
-    version="1.0.0",
+    version="1.0.1",
     packages=find_packages(include=["cryptkeeper"]),
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
@@ -11,6 +11,7 @@ setup(
         "rhotermpredict",
         "promotercalculator",
         "bokeh",
+        "biopython"
     ],
     # metadata to display on PyPI
     author="Barrick Lab",
