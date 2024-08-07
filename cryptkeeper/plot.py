@@ -55,10 +55,10 @@ def plot_boxes(features_list):
             "stop_y",
             "burden",
             "strand",
-            "expression",
+            "tir",
         ]
     )
-    highest_expression = 0
+    highest_tir = 0
     highest_burden = 0
 
     for feature in features_list:
@@ -66,7 +66,7 @@ def plot_boxes(features_list):
         stop_x = int(feature.end)
         burden = float(feature.burden)
         strand = feature.strand
-        expression = feature.expression
+        tir = feature.tir
 
         if burden > highest_burden:
             highest_burden = burden
@@ -74,19 +74,19 @@ def plot_boxes(features_list):
         if start_x > stop_x:  # Reverse stranded ORF
             start_x, stop_x = stop_x, start_x
 
-        # expression = float(10 ** abs(expression))  # Calculate expression
-        if expression > highest_expression:
-            highest_expression = expression
+        # tir = float(10 ** abs(tir))  # Calculate tir
+        if tir > highest_tir:
+            highest_tir = tir
 
         to_add = 0
         failed = True
 
         start_y = 0
-        stop_y = 0 + expression
+        stop_y = 0 + tir
 
         while failed:
             start_y = to_add
-            stop_y = to_add + expression
+            stop_y = to_add + tir
 
             about_to_break = False
 
@@ -99,17 +99,17 @@ def plot_boxes(features_list):
                 if start_x >= stop_x_checking or stop_x <= start_x_checking:
                     continue
 
-                if np.sign(expression) != np.sign(stop_y_checking):
+                if np.sign(tir) != np.sign(stop_y_checking):
                     continue
 
-                if np.sign(expression) == 1:
+                if np.sign(tir) == 1:
                     if start_y >= stop_y_checking or stop_y <= start_y_checking:
                         continue
                     to_add = stop_y_checking
                     about_to_break = True
                     break
 
-                if np.sign(expression) == -1:
+                if np.sign(tir) == -1:
                     if start_y <= stop_y_checking or stop_y >= start_y_checking:
                         continue
                     to_add = stop_y_checking
@@ -129,7 +129,7 @@ def plot_boxes(features_list):
             stop_y,
             burden,
             strand,
-            expression,
+            tir,
         ]
 
     bokah_orfs = {
@@ -156,7 +156,7 @@ def plot_boxes(features_list):
         bokah_orfs["h"].append(
             abs(placed_ORFs.loc[i, "stop_y"] - placed_ORFs.loc[i, "start_y"])
         )
-        bokah_orfs["rbs_strength"].append(placed_ORFs.loc[i, "expression"])
+        bokah_orfs["rbs_strength"].append(placed_ORFs.loc[i, "tir"])
         bokah_orfs["burden"].append(placed_ORFs.loc[i, "burden"])
         bokah_orfs["position"].append(
             f'{placed_ORFs.loc[i, "start_x"]}-{placed_ORFs.loc[i, "stop_x"]}'
@@ -179,11 +179,13 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         height=750,
     )
     fig.xaxis.axis_label = "Position"
-    fig.yaxis.axis_label = "Predicted Expression"
+    fig.yaxis.axis_label = "Predicted Translation"
     fig.yaxis.visible = False
     fig.ygrid.visible = False
     fig.xgrid.visible = False
     fig.toolbar.logo = None
+
+    fig.lod_threshold = None
 
     wigits = []
     tables = {}
@@ -193,11 +195,10 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         "y_range3": Range1d(start=-1, end=1),
         "y_range4": Range1d(start=-1, end=1),
     }
-    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Predicted Expression")
+    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Predicted Translation")
     fig.add_layout(shownaxis, "left")
 
     fig.extra_x_ranges = {
-        "x_range2": Range1d(start=0, end=annotation_scale_range),
         "x_range3": Range1d(start=0, end=len(cryptresult.sequence)),
     }
 
@@ -242,7 +243,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         line_width=2,
         color="black",
         y_range_name="y_range2",
-        x_range_name="x_range2",
     )
 
     reverse_height = None
@@ -257,7 +257,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_width=2,
             color="black",
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         annotation_depth = -3000
     elif forward_exists:
@@ -269,7 +268,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_width=2,
             color="black",
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         annotation_depth = -2500
     elif view_format == "mirrored" and reverse_exists:
@@ -378,7 +376,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_color="black",
             line_width=1,
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         genbank_glyphs_hover = HoverTool(
             renderers=[genbank_glyphs], tooltips=[("Name", "@name")]
@@ -394,7 +391,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_width=2,
             color="black",
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         annotation_depth = lowest_annotation_y
 
@@ -408,7 +404,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_width=2,
             color="black",
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         annotation_depth = reverse_height - 1000
 
@@ -462,7 +457,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_color="black",
             line_width=1,
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         promoter_glyphs_hover = HoverTool(
             renderers=[promoter_glyphs],
@@ -566,7 +560,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_color="black",
             line_width=1,
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         terminator_glyphs_hover = HoverTool(
             renderers=[terminator_glyphs],
@@ -654,7 +647,6 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             line_color="black",
             line_width=1,
             y_range_name="y_range2",
-            x_range_name="x_range2",
         )
         terminator_glyphs_hover = HoverTool(
             renderers=[terminator_glyphs],
@@ -711,24 +703,24 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         if view_format == "mirrored":
             # Get the forward strand CDSs
             expressed_CDSs_fwd = [x for x in expressed_CDSs if x.strand == "+"]
-            boxes_fwd, highest_expression_fwd = plot_boxes(expressed_CDSs_fwd)
+            boxes_fwd, highest_tir_fwd = plot_boxes(expressed_CDSs_fwd)
             highest_y_pos = max(
                 [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])]
             )
 
             # Get the reverse strand CDSs
             expressed_CDSs_rev = [x for x in expressed_CDSs if x.strand == "-"]
-            boxes_rev, highest_expression_rev = plot_boxes(expressed_CDSs_rev)
+            boxes_rev, highest_tir_rev = plot_boxes(expressed_CDSs_rev)
             highest_y_neg = max(
                 [(x[0] + x[1]) for x in zip(boxes_rev["y"], boxes_rev["h"])]
             )
         elif view_format == "stacked":
             expressed_CDSs_fwd = [x for x in expressed_CDSs]
-            boxes_fwd, highest_expression_fwd = plot_boxes(expressed_CDSs_fwd)
+            boxes_fwd, highest_tir_fwd = plot_boxes(expressed_CDSs_fwd)
             highest_y_pos = max(
                 [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])]
             )
-            boxes_rev, highest_expression_rev = (
+            boxes_rev, highest_tir_rev = (
                 {
                     "x": [],
                     "y": [],
@@ -748,7 +740,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
                 f'view_format must be "mirrored" or "stacked". {view_format} is not a valid option.'
             )
 
-        highest_expression = max(highest_expression_fwd, highest_expression_rev)
+        highest_tir = max(highest_tir_fwd, highest_tir_rev)
 
         # Calculate the space needed for the annotations
         total_range = highest_y_pos + highest_y_neg
@@ -769,7 +761,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
 
         # Plot the forward and the reverse (if they exist)
         cmap = linear_cmap(
-            field_name="burden", palette=viridis(256), low=0, high=highest_expression
+            field_name="burden", palette=viridis(256), low=0, high=highest_tir
         )
         if forward_exists:
             source = ColumnDataSource(boxes_fwd)
@@ -841,7 +833,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
             title_location="right",
             width=100,
             height=750,
-            y_range=(0, highest_expression),
+            y_range=(0, highest_tir),
             toolbar_location=None,
             min_border=0,
             outline_line_color=None,
@@ -936,7 +928,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None):
         wigits.append((max_y_pos, max_y_js))
         wigits.append((max_y_neg, max_y_js))
 
-        max_burden = TextInput(title="Max burden", value=str(highest_expression))
+        max_burden = TextInput(title="Max burden", value=str(highest_tir))
         max_burden_js = CustomJS(
             args=dict(color_bar=color_bar),
             code="""

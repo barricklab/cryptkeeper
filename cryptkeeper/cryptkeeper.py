@@ -26,7 +26,7 @@ from .helpers import delay_iterator, FakeLogger
 
 
 def main() -> None:
-    """CLI Entry Point for Cryptkeeper"""
+    """CLI Entry Point for CryptKeeper"""
 
     # Create the argument parser
     parser = argparse.ArgumentParser(
@@ -99,6 +99,13 @@ def main() -> None:
         type=int,
         help="Y axis tick frequency (default 1000)",
     )
+    parser.add_argument(
+        "--no-vis",
+        action="store_true",
+        dest="no_vis",
+        required=False,
+        help="Skip visualization",
+    )
     # Parse the command line arguments
     options = parser.parse_args()
 
@@ -125,7 +132,8 @@ def main() -> None:
 
     # Print a message indicating that the analysis is finished
     # Plot the result using the selected visualization method
-    _ = make_plot(result, tick_frequency=options.tick_frequency, filename=options.o)
+    if not options.no_vis:
+        _ = make_plot(result, tick_frequency=options.tick_frequency, filename=options.o)
 
     # Print a message indicating that the process is done
     logger.info("Cryptkeeper finished")
@@ -359,13 +367,13 @@ def cryptkeeper(
             # Otherwise, we assign color based on the feature type
             elif feature_type in ["gene"]:
                 color = COLORS["cds"]
-            elif feature_type in ["promoter"]:
+            elif feature_type in ["promoter", "regulatory"]:
                 color = COLORS["promoter"]
-            elif feature_type in ["terminator"]:
+            elif feature_type in ["terminator", "stem_loop"]:
                 color = COLORS["terminator"]
             elif feature_type in ["ori", "rep_origin"]:
                 color = COLORS["ori"]
-            elif feature_type in ["ncRNA"]:
+            elif feature_type in ["ncrna"]:
                 color = COLORS["ncrna"]
             elif feature_type in ["primer_bind"]:
                 color = COLORS["primer_bind"]
@@ -540,7 +548,7 @@ def cryptkeeper(
     # Identify expressed orfs
     expressed_orfs = []
     expressed_orf = namedtuple(
-        "orf_result", "start, end, expression, burden, dG, array, start_codon, strand"
+        "orf_result", "start, end, tir, burden, dG, array, start_codon, strand"
     )
     orfs = orf_predictions
     start_codons_fwd = {}  # Value is index in rbs_predictions. Havent checked, probably faster than looping dicts.
@@ -610,7 +618,7 @@ def cryptkeeper(
 
     # Filter predictions that we show
     expressed_orfs = list(
-        filter(lambda x: float(x.expression) > rbs_score_cutoff, expressed_orfs)
+        filter(lambda x: float(x.tir) > rbs_score_cutoff, expressed_orfs)
     )
 
     # ---- CIRCULAR SEQUENCE ----

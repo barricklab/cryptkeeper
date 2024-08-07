@@ -11,7 +11,7 @@ setup(
         "rhotermpredict",
         "promotercalculator",
         "selenium",
-        "bokeh"
+        "bokeh",
     ],
     # metadata to display on PyPI
     author="Barrick Lab",
