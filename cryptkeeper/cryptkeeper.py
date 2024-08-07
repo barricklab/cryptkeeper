@@ -146,7 +146,12 @@ def main() -> None:
             show_small = options.show_small
         else:
             show_small = False
-        _ = make_plot(result, tick_frequency=options.tick_frequency, filename=options.o, show_small=show_small)
+        _ = make_plot(
+            result,
+            tick_frequency=options.tick_frequency,
+            filename=options.o,
+            show_small=show_small,
+        )
 
     # Print a message indicating that the process is done
     logger.info("Cryptkeeper finished")

@@ -26,7 +26,7 @@ from bokeh.models import (
     PanTool,
     BoxZoomTool,
     SaveTool,
-    NumberFormatter
+    NumberFormatter,
 )
 from bokeh.embed import components
 from bokeh.models.widgets import DataTable, TableColumn
@@ -869,8 +869,12 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         color_bar.major_label_text_font_size = FONTSIZE
         silence(warning=MISSING_RENDERERS)
 
-        max_y_pos = TextInput(title="Max Y (Top track)", value=str(math.ceil(highest_y_pos)))
-        max_y_neg = TextInput(title="Max Y (Bottom track)", value=str(math.ceil(highest_y_neg)))
+        max_y_pos = TextInput(
+            title="Max Y (Top track)", value=str(math.ceil(highest_y_pos))
+        )
+        max_y_neg = TextInput(
+            title="Max Y (Bottom track)", value=str(math.ceil(highest_y_neg))
+        )
 
         # fix the Y axis tickers
         ticker_locations = [n for n in range(0, 1000 * 1000, tick_frequency)]
@@ -1100,16 +1104,15 @@ def generate_bokeh_table(datalist, name) -> DataTable:
 
     columns = []
     for column_name in column_names:
-            if column_name in ["score", "c_over_g", "tail_score", "burden", "dG"]:
-                formatted_column = TableColumn(
-                    field=column_name,
-                    title=column_name,
-                    formatter=NumberFormatter(format = "‘0,0.0’", rounding="round"),
-                )
-            else:
-                formatted_column = TableColumn(field=column_name, title=column_name)
-            columns.append(formatted_column)
-
+        if column_name in ["score", "c_over_g", "tail_score", "burden", "dG"]:
+            formatted_column = TableColumn(
+                field=column_name,
+                title=column_name,
+                formatter=NumberFormatter(format="‘0,0.0’", rounding="round"),
+            )
+        else:
+            formatted_column = TableColumn(field=column_name, title=column_name)
+        columns.append(formatted_column)
 
     name_div = Div(text=f"<h1>{name}</h1>")
     table = DataTable(
