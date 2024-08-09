@@ -187,7 +187,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
     )
 
     fig.xaxis.axis_label = "Position"
-    fig.yaxis.axis_label = "Predicted Translation"
+    fig.yaxis.axis_label = "Translation Initiation Rate (a.u.)"
     fig.yaxis.visible = False
     fig.ygrid.visible = False
     fig.xgrid.visible = False
@@ -203,7 +203,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         "y_range3": Range1d(start=-1, end=1),
         "y_range4": Range1d(start=-1, end=1),
     }
-    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Predicted Translation")
+    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Translation Initiation Rate (a.u.)")
     fig.add_layout(shownaxis, "left")
 
     fig.extra_x_ranges = {
@@ -851,7 +851,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             )
 
         color_bar_figure = figure(
-            title="Burden",
+            title="Translational Burden (a.u.)",
             title_location="right",
             width=100,
             height=750,
@@ -1006,7 +1006,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
     else:
         name_div = Div()
     burden_div = Div(
-        text=f'<h2 style="font-family: {FONT}; font-size: {FONTSIZE}">Total Burden: {round(cryptresult.burden, 2)}</h2>'
+        text=f'<h2 style="font-family: {FONT}; font-size: {FONTSIZE}">Total Translational Burden: {round(cryptresult.burden, 2)}</h2>'
     )
 
     widgets_to_add = []

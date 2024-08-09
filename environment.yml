@@ -3,7 +3,6 @@ channels:
   - bioconda
 dependencies:
   - python>=3.9
-  - viennarna=2.4.18
   - ostir
   - transtermhp
   - pip
@@ -11,3 +10,4 @@ dependencies:
       - rhotermpredict
       - promotercalculator
       - bokeh
+      - biopython
