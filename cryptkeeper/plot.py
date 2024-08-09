@@ -203,7 +203,9 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         "y_range3": Range1d(start=-1, end=1),
         "y_range4": Range1d(start=-1, end=1),
     }
-    shownaxis = LinearAxis(y_range_name="y_range3", axis_label="Translation Initiation Rate (a.u.)")
+    shownaxis = LinearAxis(
+        y_range_name="y_range3", axis_label="Translation Initiation Rate (a.u.)"
+    )
     fig.add_layout(shownaxis, "left")
 
     fig.extra_x_ranges = {
