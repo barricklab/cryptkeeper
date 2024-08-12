@@ -2,32 +2,33 @@
 ![CryptKeeper logo with name](./cryptkeeper/assets/cryptkeeper_long.svg)
 
 
-CryptKeeper is a computational pipeline designed to predict the presence of open reading frames that are burdensome due to substantial ribosome sequestration on plasmids, particularly virus infectious clones. CryptKeeper also uses other prediction tools, such as promoter prediction and terminator prediction, to provide additional context. Burden from strongly expressed, long open reading frames have been found to render plasmids evolutionarily unstable or unclonable. In addition to highlighting burden from ribosome absorption, we've also found that CryptKeeper is capable of displaying alternative translation initiation sites that lead to protein truncations. This is an important consideration for experiments that rely on protein fusions or tagging.
+`CryptKeeper` is a computational pipeline designed to predict the presence of open reading frames that are burdensome due to substantial ribosome sequestration on plasmids, particularly virus infectious clones. `CryptKeeper` also uses other prediction tools, such as promoter prediction and terminator prediction, to provide additional context. Burden from strongly expressed, long open reading frames have been found to render plasmids evolutionarily unstable or unclonable. In addition to highlighting burden from ribosome absorption, we've also found that `CryptKeeper` is capable of displaying alternative translation initiation sites that lead to protein truncations. This is an important consideration for experiments that rely on protein fusions or tagging.
 
 
-CryptKeeper provides an output in the form of CSV files (for downstream data processing) and a Bokeh plot for interactive visualization. The Bokeh plot uses the SVG backend and can be saved to support assembling downstream figures.
+`CryptKeeper` provides an output in the form of CSV files (for downstream data processing) and a Bokeh plot for interactive visualization. The Bokeh plot uses the SVG backend and can be saved to support assembling downstream figures.
 
 
 ![Example CryptKeeper output of a medium strength BFP expression plasmid.](./examples/output.png)
-Above is an example of a Bokeh plot produced by CryptKeeper. The two outer tracks display predicted RBS strength versus sequence position (the product being 'burden'). The inner tracks display predicted promoters (green), rho-dependent terminators (red), and rho-independent terminators (purple). The innermost track displays annotations extracted from the provited genbank file.
+Above is an example of a Bokeh plot produced by `CryptKeeper`. The two outer tracks display predicted RBS strength versus sequence position (the product being 'burden'). The inner tracks display predicted promoters (green), rho-dependent terminators (red), and rho-independent terminators (purple). The innermost track displays annotations extracted from the provited genbank file.
 
 
 # Quick Start
 ## Installation
 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/cryptkeeper/README.html)
 
-### For Developers
-CryptKeeper is currently in development. Adventurous users can install dependencies on their own through other means. The simplest way to install CryptKeeper is through conda by:
-
-
-* Cloning this repository to your machine
-* `conda env create -f environment.yml`
-* `conda activate cryptkeeper`
-* `pip install ./`
+`CryptKeeper` is a Python module and associated command line script. We recommend installing `CryptKeeper` using [Bioconda](https://bioconda.github.io/) on Linux or macOS. This will automatically install `CryptKeeper` and all of its dependencies.
 
 
-CryptKeeper is also available through pip, but requires manual installation of ViennaRNA and an appropriate Selenium configuration (for generating SVG figures).
+From Bioconda (recommended; Linux, macOS):
+- Run `conda install -c bioconda cryptkeeper`
 
+From Pip (for experts; Linux, macOS, Windows):
+- Download and install ViennaRNA, following the instructions [here](https://www.tbi.univie.ac.at/RNA/).
+- Download and install TranstermHP [here](https://transterm.cbcb.umd.edu/). Add TransTermHP binaries to your path.
+- Run `pip install cryptkeeper`
+
+Developers may consider downloading and installing `CryptKeeper` other dependencies by forking their respective repositories and installing them from their repository directory.
 
 ## Command Line Usage Usage
 
@@ -66,7 +67,7 @@ cryptkeeper -i pSMART-LCKan-BPMV1.fna -o output/pSMART-LCKan-BPMV1 -j 8 -c
 ## Python Usage
 
 
-In certain situations, it may be valuable to use CryptKeeper as a python dependency for another pipeline.
+In certain situations, it may be valuable to use `CryptKeeper` as a python dependency for another pipeline.
 The primary entry point for python development is `cryptkeeper.cryptkeeper()`, which has the following arguments:
 
 
@@ -88,7 +89,7 @@ rbs_score_cutoff : float, optional
 ```
 
 
-This function returns an object that contains predictions made by CryptKeeper as well as some metadata information extracted directly from an input Genbank file if one is provided. The object has the following attributes:
+This function returns an object that contains predictions made by `CryptKeeper` as well as some metadata information extracted directly from an input GenBank file if one is provided. The object has the following attributes:
 
 
 * `name`: the name of the sample in the form of a `str`
