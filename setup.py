@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="cryptkeeper",
     version="1.0.1",
-    python_requires='>=3.10',
+    python_requires=">=3.10",
     packages=find_packages(include=["cryptkeeper"]),
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
@@ -13,6 +13,8 @@ setup(
         "promotercalculator",
         "bokeh",
         "biopython",
+        "numpy",
+        "viennarna"
     ],
     # metadata to display on PyPI
     author="Barrick Lab",

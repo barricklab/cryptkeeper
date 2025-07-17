@@ -28,6 +28,8 @@ From Pip (for experts; Linux, macOS, Windows):
 - Download and install TranstermHP [here](https://transterm.cbcb.umd.edu/). Add TransTermHP binaries to your path.
 - Run `pip install cryptkeeper`
 
+For Nix users, a shell flake is included which will install ViennaRNA and TransTermHP automatically, as well as set up a venv for you to continue the installation with pip.
+
 Developers may consider downloading and installing `CryptKeeper` other dependencies by forking their respective repositories and installing them from their repository directory.
 
 ## Command Line Usage Usage
