@@ -725,20 +725,20 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             expressed_CDSs_fwd = [x for x in expressed_CDSs if x.strand == "+"]
             boxes_fwd, highest_tir_fwd = plot_boxes(expressed_CDSs_fwd)
             highest_y_pos = max(
-                [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])]
+                [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])] + [0]
             )
 
             # Get the reverse strand CDSs
             expressed_CDSs_rev = [x for x in expressed_CDSs if x.strand == "-"]
             boxes_rev, highest_tir_rev = plot_boxes(expressed_CDSs_rev)
             highest_y_neg = max(
-                [(x[0] + x[1]) for x in zip(boxes_rev["y"], boxes_rev["h"])]
+                [(x[0] + x[1]) for x in zip(boxes_rev["y"], boxes_rev["h"])] + [0]
             )
         elif view_format == "stacked":
             expressed_CDSs_fwd = [x for x in expressed_CDSs]
             boxes_fwd, highest_tir_fwd = plot_boxes(expressed_CDSs_fwd)
             highest_y_pos = max(
-                [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])]
+                [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])] + [0]
             )
             boxes_rev, highest_tir_rev = (
                 {
