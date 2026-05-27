@@ -168,14 +168,44 @@ def _read_transterm_output(input_file_name):
 
         # Pick up the sequence line
         if last_line_was_prediction:
-            new_entry["seq_upstream"] = split_line[0]
-            new_entry["seq_hairpin_open"] = split_line[1]
-            new_entry["seq_hairpin_loop"] = split_line[2]
-            new_entry["seq_hairpin_close"] = split_line[3]
-            new_entry["seq_tail"] = split_line[4]
-
+            if len(split_line) == 5:
+                new_entry["seq_upstream"] = split_line[0]
+                new_entry["seq_hairpin_open"] = split_line[1]
+                new_entry["seq_hairpin_loop"] = split_line[2]
+                new_entry["seq_hairpin_close"] = split_line[3]
+                new_entry["seq_tail"] = split_line[4]
+            elif len(split_line) == 3: # Edge case where no upstream/downstream is reported
+                new_entry["seq_upstream"] = ""
+                new_entry["seq_hairpin_open"] = split_line[0]
+                new_entry["seq_hairpin_loop"] = split_line[1]
+                new_entry["seq_hairpin_close"] = split_line[2]
+                new_entry["seq_tail"] = ""
+            elif len(split_line) == 4: # Edge case where either upstream/downstream is missing
+                component_2_loop_delta = abs(len(split_line[1])-expected_loop_length)
+                component_3_loop_delta = abs(len(split_line[2])-expected_loop_length)
+                if component_2_loop_delta == component_3_loop_delta: # Impossible to determine loop. Skip terminator
+                    new_entry = {}
+                    last_line_was_prediction = False
+                    continue
+                elif component_2_loop_delta < component_3_loop_delta: # Second component is loop, missing upstream
+                    new_entry["seq_upstream"] = ""
+                    new_entry["seq_hairpin_open"] = split_line[0]
+                    new_entry["seq_hairpin_loop"] = split_line[1]
+                    new_entry["seq_hairpin_close"] = split_line[2]
+                    new_entry["seq_tail"] = split_line[3]
+                else: # Third component is loop, missing downstream
+                    new_entry["seq_upstream"] = split_line[0]
+                    new_entry["seq_hairpin_open"] = split_line[1]
+                    new_entry["seq_hairpin_loop"] = split_line[2]
+                    new_entry["seq_hairpin_close"] = split_line[3]
+                    new_entry["seq_tail"] = ""
+            else: # Edge case where major components of the terminator are missing or transterm reported too many parts
+                new_entry = {}
+                last_line_was_prediction = False
+                continue
+            
             entry_list.append(new_entry)
-
+                
             new_entry = {}
             last_line_was_prediction = False
             continue
