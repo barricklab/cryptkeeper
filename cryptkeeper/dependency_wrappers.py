@@ -167,6 +167,7 @@ def _read_transterm_output(input_file_name):
         split_line = line.split()
 
         # Pick up the sequence line
+        expected_loop_length = 4
         if last_line_was_prediction:
             if len(split_line) == 5:
                 new_entry["seq_upstream"] = split_line[0]
