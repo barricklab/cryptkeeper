@@ -12,3 +12,5 @@ dependencies:
       - bokeh
       - biopython
       - numpy
+      - pandas
+      - setuptools
