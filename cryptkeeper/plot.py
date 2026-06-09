@@ -1074,7 +1074,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             )
         else:
             layout = column(
-                layout, *tables, styles={"margin": "0 auto", "align-items": "center"}
+                layout, *tables.values(), styles={"margin": "0 auto", "align-items": "center"}
             )
 
     if filename:
