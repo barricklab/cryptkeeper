@@ -123,15 +123,15 @@ def transterm(infile, circular_length):
 
         # run once for predictions on both strands
         predictions_path = os.path.join(temp_dir, "predictions.txt")
-        result = subprocess.call(
-            f"transterm --min-conf=70 -p {transterm_expdat_path} "
-            f"{infile} {dummy_coords_path} > {predictions_path}",
-            shell=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        with open(predictions_path, "w") as pred_file:
+            result = subprocess.run(
+                ["transterm", "--min-conf=70", "-p", transterm_expdat_path,
+                 infile, dummy_coords_path],
+                stdout=pred_file,
+                stderr=subprocess.DEVNULL,
+            )
 
-        if result != 0:
+        if result.returncode != 0:
             warning("TransTermHP returned a non-zero exit code.")
             return []
 
