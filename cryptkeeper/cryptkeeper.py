@@ -210,6 +210,10 @@ def cryptkeeper(
     # Makes relative file arguments absolute for more robust execution
 
     input_sequence = os.path.abspath(input_file)
+
+    if not os.path.isfile(input_sequence):
+        raise FileNotFoundError(f"Input file not found: {input_file}")
+
     input_gene_name = input_sequence.split("/")[-1]
     input_file_type = input_gene_name.split(".")[-1]
     input_gene_name = ".".join(input_gene_name.split(".")[:-1])
@@ -252,6 +256,11 @@ def cryptkeeper(
     else:
         infile = input_sequence
     sequences = list(SeqIO.parse(infile, "fasta"))
+    if not sequences:
+        raise ValueError(
+            f"No sequences found in input file: {infile}"
+        )
+
     single_sequence = deepcopy(
         sequences[0].seq
     )  # We need to keep ahold of the original sequence to revert from circularizing
@@ -356,12 +365,12 @@ def cryptkeeper(
     )
     features_list = []
     if input_file_type in ["genbank", "gb", "gbk", "gbff"]:
-        features = [
-            feature
-            for feature in [rec for rec in SeqIO.parse(input_sequence, "genbank")][
-                0
-            ].features
-        ]
+        records = list(SeqIO.parse(input_sequence, "genbank"))
+        if not records:
+            raise ValueError(
+                f"No records found in input GenBank file: {input_sequence}"
+            )
+        features = list(records[0].features)
 
         delayable_features = delay_iterator(
             features
@@ -475,10 +484,15 @@ def cryptkeeper(
     for this_seq in SeqIO.parse(input_file_name, "fasta"):
         i += 1
         if i > 1:
-            exit()
+            raise ValueError(
+                "Input file contains multiple sequences. "
+                "Only single-sequence files are supported."
+            )
         main_seq = this_seq.upper()
     if not main_seq:
-        exit()
+        raise ValueError(
+            f"No sequences found in input file: {input_file_name}"
+        )
 
     # ------------------------------------------------------------------------------
     # PERFORM TERMINATOR PREDICTIONS
@@ -583,13 +597,9 @@ def cryptkeeper(
     for orf in orfs:
         if orf["strand"] == "+":
             expressed_starts = start_codons_fwd
-            array_minus = 0
-            orf_array = int(orf["end"]) - int(orf["start"]) + 1
             offset = 1
         else:
             expressed_starts = start_codons_rev
-            array_minus = int(orf["start"]) - int(orf["end"]) + 1
-            orf_array = 0
             offset = -1
 
         orf_info = orf
@@ -622,17 +632,6 @@ def cryptkeeper(
             expressed_orfs.append(processed_orf)
 
             total_burden += orf_length * rbs_info.score
-
-            #   When available, assign RBS info to orf
-            orf["array"] = orf_array
-            orf["array_minus"] = array_minus
-            orf["rbs_score"] = rbs_score
-
-        else:
-            rbs_score = 0
-            orf["array"] = orf_array
-            orf["array_minus"] = array_minus
-            orf["rbs_score"] = rbs_score
 
     # Filter predictions that we show
     expressed_orfs = list(

@@ -95,8 +95,16 @@ def main(options):
     for this_seq in SeqIO.parse(options.i, "fasta"):
         i += 1
         if i > 1:
-            exit()
+            raise ValueError(
+                "Input file contains multiple sequences. "
+                "Only single-sequence files are supported."
+            )
         main_seq = this_seq.upper()
+
+    if main_seq is None:
+        raise ValueError(
+            f"No sequences found in input file for ORF prediction: {options.i}"
+        )
 
     orfs = find_orfs(main_seq, translation_table_id, minimum_orf_aa_length)
 

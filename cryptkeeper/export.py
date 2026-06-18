@@ -132,10 +132,10 @@ def from_json(input_path: str) -> CryptResults:
                                         downstream_seq,
                                         palindromes,
                                         pause_concensus,
-                                        scores""",
+                                        score""",
     )
     annotations = namedtuple(
-        "feature", ["name", "strand", "start", "end", "color", "nest_level"]
+        "feature", ["name", "strand", "start", "end", "color", "nest_level", "type"]
     )
 
     for i, hit in enumerate(results.translation_sites):

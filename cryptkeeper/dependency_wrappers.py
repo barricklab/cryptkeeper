@@ -1,4 +1,5 @@
 import os
+import shutil
 from Bio import SeqIO
 from collections import namedtuple
 import tempfile
@@ -21,6 +22,11 @@ def ostir(inseq, threads=1):
         sequence_length = len(this_seq)
         forward_seq = str(this_seq.upper().seq)
         reverse_seq = str(this_seq.reverse_complement().upper().seq)
+
+    if not forward_seq:
+        raise ValueError(
+            f"No sequences found in input file for RBS prediction: {inseq}"
+        )
 
     # Run OSTIR Calculator twice on entire sequences. Once for each strand.
     from ostir.ostir import run_ostir
@@ -67,13 +73,20 @@ def ostir(inseq, threads=1):
 def transterm(infile, circular_length):
     with tempfile.TemporaryDirectory() as temp_dir:
         i = 0
+        main_seq = None
         for this_seq in SeqIO.parse(infile, "fasta"):
             i += 1
             assert i == 1, "Only one sequence per file is supported"
             main_seq = this_seq.upper()
 
+        if main_seq is None:
+            raise ValueError(
+                f"No sequences found in input file for TransTerm prediction: {infile}"
+            )
+
         # unique step, create dummy cords files so that entire sequence is downstream of genes on both strands
-        with open(temp_dir + ".dummy.coords", "w") as dummy_coords_file:
+        dummy_coords_path = os.path.join(temp_dir, "dummy.coords")
+        with open(dummy_coords_path, "w") as dummy_coords_file:
             dummy_coords_file.write("gene1 1 2 " + main_seq.id + "\n")
             dummy_coords_file.write(
                 "gene2 "
@@ -86,13 +99,12 @@ def transterm(infile, circular_length):
             )
 
         transterm_expdat_path = ""
-        transterm_path = subprocess.check_output(["which", "transterm"]).strip()
+        transterm_path = shutil.which("transterm")
         if "TRANSTERM_EXPDAT_PATH" in os.environ:
-            transterm_expdat_path = os.getenv("TRANSTERM_EXPDAT_PATH")
+            transterm_expdat_path = os.environ["TRANSTERM_EXPDAT_PATH"]
         elif transterm_path:
             # Find the expterm.dat file
-            transterm_path = subprocess.check_output(["which", "transterm"]).strip()
-            transterm_expdat_path = os.path.normpath(transterm_path).decode("utf-8")
+            transterm_expdat_path = os.path.normpath(transterm_path)
             transterm_expdat_path = transterm_expdat_path.split(os.sep)
             transterm_expdat_path = (
                 os.sep.join(transterm_expdat_path[:-2])
@@ -106,32 +118,31 @@ def transterm(infile, circular_length):
             warning(
                 "Could not detect transterm installation. Please verify that transterm is installed via conda or that the environment variable TRANSTERM_EXPDAT_PATH is set correctly."
             )
-            return 2
+            return []
 
         if isinstance(transterm_expdat_path, bytes):
             transterm_expdat_path = transterm_expdat_path.decode("utf-8")
 
         # run once for predictions on both strands
-        # print('transterm --min-conf=70  -p ' + transterm_expdat_path + ' ' + options.i + options.o + '.dummy.coords > ' + options.o + '.predictions.txt')
-        subprocess.call(
-            "transterm --min-conf=70  -p "
-            + transterm_expdat_path
-            + " "
-            + infile
-            + " "
-            + temp_dir
-            + ".dummy.coords > "
-            + temp_dir
-            + ".predictions.txt",
+        predictions_path = os.path.join(temp_dir, "predictions.txt")
+        result = subprocess.call(
+            f"transterm --min-conf=70 -p {transterm_expdat_path} "
+            f"{infile} {dummy_coords_path} > {predictions_path}",
             shell=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
 
+        if result != 0:
+            warning("TransTermHP returned a non-zero exit code.")
+            return []
+
         # returns a list of dictionaries for the rows
 
         # Parse output and create one summary file
-        final_list = _read_transterm_output(temp_dir + ".predictions.txt")
+        if not os.path.exists(predictions_path):
+            return []
+        final_list = _read_transterm_output(predictions_path)
 
         # Sort list by coordinate
         final_list = sorted(final_list, key=itemgetter("start"))
