@@ -804,32 +804,34 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         source = ColumnDataSource(boxes)
 
         if forward_exists:
-            color_bar = rectangles_fwd.construct_color_bar(
-                padding=0, ticker=fig.xaxis.ticker, formatter=fig.xaxis.formatter
-            )
+            rect_glyph = rectangles_fwd
+        elif reverse_exists:
+            rect_glyph = rectangles_rev
         else:
-            color_bar = rectangles_fwd.construct_color_bar(
+            rect_glyph = None
+
+        if rect_glyph is not None:
+            color_bar = rect_glyph.construct_color_bar(
                 padding=0, ticker=fig.xaxis.ticker, formatter=fig.xaxis.formatter
             )
-
-        color_bar_figure = figure(
-            title="Translational Burden (a.u.)",
-            title_location="right",
-            width=100,
-            height=750,
-            y_range=(0, highest_tir),
-            toolbar_location=None,
-            min_border=0,
-            outline_line_color=None,
-        )
-        color_bar_figure.add_layout(color_bar, "right")
-        color_bar_figure.title.align = "center"
-        color_bar_figure.title.text_font_size = FONTSIZE
-        color_bar_figure.title.text_font = FONT
-        color_bar_figure.title.text_font_style = "bold"
-        color_bar.major_label_text_font = FONT
-        color_bar.major_label_text_font_size = FONTSIZE
-        silence(warning=MISSING_RENDERERS)
+            color_bar_figure = figure(
+                title="Translational Burden (a.u.)",
+                title_location="right",
+                width=100,
+                height=750,
+                y_range=(0, highest_tir),
+                toolbar_location=None,
+                min_border=0,
+                outline_line_color=None,
+            )
+            color_bar_figure.add_layout(color_bar, "right")
+            color_bar_figure.title.align = "center"
+            color_bar_figure.title.text_font_size = FONTSIZE
+            color_bar_figure.title.text_font = FONT
+            color_bar_figure.title.text_font_style = "bold"
+            color_bar.major_label_text_font = FONT
+            color_bar.major_label_text_font_size = FONTSIZE
+            silence(warning=MISSING_RENDERERS)
 
         max_y_pos = TextInput(
             title="Max Y (Top track)", value=str(math.ceil(highest_y_pos))

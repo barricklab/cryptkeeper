@@ -106,7 +106,7 @@ def from_json(input_path: str) -> CryptResults:
 
     # Correct the data type from the json
     expressed_orf = namedtuple(
-        "orf_result", "start, end, expression, burden, dG, array, start_codon, strand"
+        "orf_result", "start, end, tir, burden, dG, array, start_codon, strand"
     )
     promocalc_hit = namedtuple(
         "promoter_calculator_result",

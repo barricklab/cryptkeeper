@@ -118,6 +118,9 @@ def main() -> None:
     # Parse the command line arguments
     options = parser.parse_args()
 
+    if options.tick_frequency <= 0:
+        parser.error("Tick frequency must be a positive integer")
+
     logger = make_logger(options.o)
 
     # Call the cryptkeeper function with the provided options
@@ -183,6 +186,7 @@ def make_logger(output=None):
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
+    logger.propagate = False
     return logger
 
 
@@ -316,8 +320,8 @@ def cryptkeeper(
             else:  # If no start codon found fill in the gaps
                 for frame, start in enumerate(found_starts):
                     if not start:
-                        found_stops[i] = -1
-                        found_starts[i] = True
+                        found_stops[frame] = -1
+                        found_starts[frame] = True
 
             if junction[0:3] in stop_codons:
                 found_stops[0] = -1
@@ -335,10 +339,11 @@ def cryptkeeper(
                     break
             else:  # If no stop codon found fill in the gaps
                 for frame, stop in enumerate(found_stops):
-                    if not stop:
+                    if stop is None:
                         found_stops[frame] = -1
 
-            overlapping_ORF = max(found_stops)
+            valid_stops = [x for x in found_stops if x is not None]
+            overlapping_ORF = max(valid_stops) if valid_stops else -1
             if overlapping_ORF > circular_length:
                 circular_length = overlapping_ORF
 
@@ -386,9 +391,9 @@ def cryptkeeper(
                 continue
 
             # If the color is defined in the genbank file, use it
-            if "ApEinfo_revcolor" in feature.qualifiers:
+            if feature.qualifiers.get("ApEinfo_revcolor"):
                 color = feature.qualifiers["ApEinfo_revcolor"][0]
-            elif "ApEinfo_fwdcolor" in feature.qualifiers:
+            elif feature.qualifiers.get("ApEinfo_fwdcolor"):
                 color = feature.qualifiers["ApEinfo_fwdcolor"][0]
 
             # Otherwise, we assign color based on the feature type
@@ -428,7 +433,7 @@ def cryptkeeper(
                 else:
                     feature_hit = feature_tuple(
                         feature_name,
-                        int(feature.location.strand),
+                        int(feature.location.strand if feature.location.strand is not None else 0),
                         feature.location.start,
                         feature.location.end,
                         color,
@@ -440,7 +445,7 @@ def cryptkeeper(
                 # Add the processed feature to the list
                 feature_hit = feature_tuple(
                     feature_name,
-                    int(feature.location.strand),
+                    int(feature.location.strand if feature.location.strand is not None else 0),
                     feature.location.start,
                     feature.location.end,
                     color,
@@ -596,7 +601,13 @@ def cryptkeeper(
             if str(rbs_score) in ["inf", "-inf"]:
                 continue
 
-            assert rbs_info.start_codon == orf_info["start_codon"]
+            if rbs_info.start_codon != orf_info["start_codon"]:
+                logger.warning(
+                    f"Mismatched start codon for ORF at {orf_info['start']}-{orf_info['end']}: "
+                    f"RBS says '{rbs_info.start_codon}', "
+                    f"ORF says '{orf_info['start_codon']}'. Skipping."
+                )
+                continue
 
             array = (
                 max(
