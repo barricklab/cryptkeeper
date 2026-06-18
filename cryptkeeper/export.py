@@ -5,12 +5,6 @@ from typing import List
 import csv
 import json
 
-CDS_COLOR = "#4b61d1"
-RBS_COLOR = "#d14b4b"
-PROMOTER_COLOR = "#2ab717"
-TERMINATOR_COLOR = "#ff0000"
-
-
 @dataclasses.dataclass
 class CryptResults:
     """Cryptkeeper results class"""

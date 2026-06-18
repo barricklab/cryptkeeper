@@ -1,7 +1,6 @@
 # Visualize the data on a bokah plot
 
 import os
-import copy
 import shutil
 import math
 import bokeh
@@ -11,7 +10,7 @@ from bokeh.transform import linear_cmap
 from bokeh.palettes import viridis
 from bokeh.layouts import column, row
 from bokeh.events import DocumentReady
-from bokeh.io import curdoc, export_svg
+from bokeh.io import curdoc
 from bokeh.plotting import figure
 from bokeh.models import (
     ColumnDataSource,
@@ -173,7 +172,6 @@ def plot_boxes(features_list):
 
 
 def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False):
-    view_format = "mirrored"
     # Set up plot
 
     annotation_scale_range = len(cryptresult.sequence)
@@ -195,7 +193,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
 
     fig.lod_threshold = None
 
-    wigits = []
+    widgets = []
     tables = {}
 
     fig.extra_y_ranges = {
@@ -257,19 +255,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
 
     reverse_height = None
     forward_height = None
-    if view_format == "stacked" and reverse_exists:
-        forward_exists = True  # The reverse track goes in place of the forward track
-        forward_height = -1000
-        reverse_height = -1000
-        fig.line(
-            [0, annotation_scale_range],
-            [-2000, -2000],
-            line_width=2,
-            color="black",
-            y_range_name="y_range2",
-        )
-        annotation_depth = -3000
-    elif forward_exists:
+    if forward_exists:
         # we add the track for forward strand annotations. We will add reverse height later
         forward_height = -1000
         fig.line(
@@ -280,13 +266,13 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             y_range_name="y_range2",
         )
         annotation_depth = -2500
-    elif view_format == "mirrored" and reverse_exists:
+    elif reverse_exists:
         annotation_depth = -500  # We will add the reverse track later after we know how much space annotations take up
     else:  # if neither exist
         annotation_depth = -500
     # Now we add the annotations so we know how much space it takes
 
-    lowest_annotation_y = copy.copy(annotation_depth) - 500
+    lowest_annotation_y = annotation_depth - 500
     if cryptresult.annotations:
         # annotation_depth -= 500
         genbank_dictionary = {
@@ -406,7 +392,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
     )
     annotation_depth = lowest_annotation_y
 
-    if view_format == "mirrored" and reverse_exists:
+    if reverse_exists:
         # We add the track for reverse strand annotations
         annotation_depth -= 500
         reverse_height = lowest_annotation_y - 500
@@ -507,7 +493,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
 
         curdoc().js_on_event(DocumentReady, promoter_javascript)
         fig.js_on_event("reset", promoter_javascript)
-        wigits.append((promoter_number, promoter_javascript))
+        widgets.append((promoter_number, promoter_javascript))
 
         # Add table
         name = "Promoters"
@@ -611,7 +597,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         )
         curdoc().js_on_event(DocumentReady, rdpt_javascript)
         fig.js_on_event("reset", rdpt_javascript)
-        wigits.append((rdpt_number, rdpt_javascript))
+        widgets.append((rdpt_number, rdpt_javascript))
 
         # Add table
         name = "Rho-Dependent Terminators"
@@ -701,7 +687,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         )
         curdoc().js_on_event(DocumentReady, ridpt_javascript)
         fig.js_on_event("reset", ridpt_javascript)
-        wigits.append((ridpt_number, ridpt_javascript))
+        widgets.append((ridpt_number, ridpt_javascript))
 
         # Add table
         name = "Intrinsic Terminators"
@@ -720,45 +706,19 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
 
         expressed_CDSs = sorted(expressed_CDSs, key=sort_algorythm, reverse=True)
 
-        if view_format == "mirrored":
-            # Get the forward strand CDSs
-            expressed_CDSs_fwd = [x for x in expressed_CDSs if x.strand == "+"]
-            boxes_fwd, highest_tir_fwd = plot_boxes(expressed_CDSs_fwd)
-            highest_y_pos = max(
-                [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])] + [0]
-            )
+        # Get the forward strand CDSs
+        expressed_CDSs_fwd = [x for x in expressed_CDSs if x.strand == "+"]
+        boxes_fwd, highest_tir_fwd = plot_boxes(expressed_CDSs_fwd)
+        highest_y_pos = max(
+            [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])] + [0]
+        )
 
-            # Get the reverse strand CDSs
-            expressed_CDSs_rev = [x for x in expressed_CDSs if x.strand == "-"]
-            boxes_rev, highest_tir_rev = plot_boxes(expressed_CDSs_rev)
-            highest_y_neg = max(
-                [(x[0] + x[1]) for x in zip(boxes_rev["y"], boxes_rev["h"])] + [0]
-            )
-        elif view_format == "stacked":
-            expressed_CDSs_fwd = [x for x in expressed_CDSs]
-            boxes_fwd, highest_tir_fwd = plot_boxes(expressed_CDSs_fwd)
-            highest_y_pos = max(
-                [(x[0] + x[1]) for x in zip(boxes_fwd["y"], boxes_fwd["h"])] + [0]
-            )
-            boxes_rev, highest_tir_rev = (
-                {
-                    "x": [],
-                    "y": [],
-                    "w": [],
-                    "h": [],
-                    "rbs_strength": [],
-                    "burden": [],
-                    "position": [],
-                    "strand": [],
-                },
-                0,
-            )
-            highest_y_neg = 0
-            expressed_CDSs_rev = []
-        else:
-            raise ValueError(
-                f'view_format must be "mirrored" or "stacked". {view_format} is not a valid option.'
-            )
+        # Get the reverse strand CDSs
+        expressed_CDSs_rev = [x for x in expressed_CDSs if x.strand == "-"]
+        boxes_rev, highest_tir_rev = plot_boxes(expressed_CDSs_rev)
+        highest_y_neg = max(
+            [(x[0] + x[1]) for x in zip(boxes_rev["y"], boxes_rev["h"])] + [0]
+        )
 
         highest_tir = max(highest_tir_fwd, highest_tir_rev)
 
@@ -955,8 +915,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
         curdoc().js_on_event(DocumentReady, max_y_js)
         fig.js_on_event("reset", max_y_js)
 
-        wigits.append((max_y_pos, max_y_js))
-        wigits.append((max_y_neg, max_y_js))
+        widgets.append((max_y_pos, max_y_js))
+        widgets.append((max_y_neg, max_y_js))
 
         max_burden = TextInput(title="Max burden", value=str(math.ceil(highest_tir)))
         max_burden_js = CustomJS(
@@ -966,7 +926,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
     color_bar.color_mapper.high = newMax
 """,
         )
-        wigits.append((max_burden, max_burden_js))
+        widgets.append((max_burden, max_burden_js))
 
         # Add table
         expressed_CDSs = sorted(expressed_CDSs, key=lambda x: x.burden, reverse=True)
@@ -1012,9 +972,11 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
     )
 
     widgets_to_add = []
-    for wigit, js in wigits:
-        wigit.js_on_change("value", js)
-        widgets_to_add.append(wigit)
+    widget_js_pairs = []
+    for widget, js in widgets:
+        widget.js_on_change("value", js)
+        widgets_to_add.append(widget)
+        widget_js_pairs.append((widget, js))
 
     # Specify we want the svg backend
     fig.output_backend = "svg"
@@ -1078,8 +1040,8 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             )
 
     if filename:
-        script, fig = components(layout)
-        export_html(script, fig, filename + "_graph.html")
+        script, fig_div = components(layout)
+        export_html(script, fig_div, filename + "_graph.html")
         # copy the assets folder to the output folder if it doesn't exist
         if os.path.exists(os.path.join(os.path.dirname(filename), "assets")):
             shutil.rmtree(os.path.join(os.path.dirname(filename), "assets"))
@@ -1087,7 +1049,7 @@ def make_plot(cryptresult, tick_frequency=1000, filename=None, show_small=False)
             os.path.join(os.path.dirname(__file__), "assets"),
             os.path.join(os.path.dirname(filename), "assets"),
         )
-        for widget, js in wigits:
+        for widget, js in widget_js_pairs:
             widget.visible = False
         return filename
 

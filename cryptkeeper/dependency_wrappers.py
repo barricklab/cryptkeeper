@@ -42,11 +42,9 @@ def ostir(inseq, threads=1):
     result = findings_forward + findings_reverse
 
     clean_findings = []  # Remove duplicates
-    [
-        clean_findings.append(finding)
-        for finding in result
-        if finding not in clean_findings
-    ]
+    for finding in result:
+        if finding not in clean_findings:
+            clean_findings.append(finding)
     processed_data = []
     rbs_hit = namedtuple("rbs_hit", "position start_codon strand score score2")
     for finding in clean_findings:

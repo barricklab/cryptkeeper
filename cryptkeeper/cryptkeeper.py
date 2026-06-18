@@ -146,7 +146,7 @@ def main() -> None:
             show_small = options.show_small
         else:
             show_small = False
-        _ = make_plot(
+        make_plot(
             result,
             tick_frequency=options.tick_frequency,
             filename=options.o,
@@ -214,14 +214,14 @@ def cryptkeeper(
     if not os.path.isfile(input_sequence):
         raise FileNotFoundError(f"Input file not found: {input_file}")
 
-    input_gene_name = input_sequence.split("/")[-1]
-    input_file_type = input_gene_name.split(".")[-1]
-    input_gene_name = ".".join(input_gene_name.split(".")[:-1])
+    input_filename = os.path.basename(input_sequence)
+    input_file_type = input_filename.split(".")[-1]
+    input_filename = os.path.splitext(input_filename)[0]
     input_file_name = input_sequence
 
     if output:
         output_path = os.path.abspath(output)
-        output_folder = "/".join(output_path.split("/")[:-1])
+        output_folder = os.path.dirname(output_path)
         # Prevent execution if output is a file instead of a folder
         if os.path.isfile(output_folder):
             raise ValueError(
@@ -244,11 +244,11 @@ def cryptkeeper(
         if input_file_type in ["genbank", "gb", "gbk", "gbff"]:
             with open(input_file_name, "r", encoding="utf-8") as file_in:
                 with open(
-                    f"{output_path + '.' + input_gene_name}.fna", "w", encoding="utf-8"
+                    f"{output_path + '.' + input_filename}.fna", "w", encoding="utf-8"
                 ) as file_converted:
                     sequences = SeqIO.parse(file_in, "genbank")
                     sequences = SeqIO.write(sequences, file_converted, "fasta")
-            infile = f"{output_path + '.' + input_gene_name}.fna"
+            infile = f"{output_path + '.' + input_filename}.fna"
         else:
             raise ValueError(
                 f"Unable to convert file ({input_file_type}?). Supported types: FASTA, GENBANK"
@@ -478,21 +478,7 @@ def cryptkeeper(
     if not name and sequences[0].name:
         # Get the name from the first contig in the genbank file
         name = sequences[0].name
-    # Load sequence
-    i = 0
-    main_seq = None
-    for this_seq in SeqIO.parse(input_file_name, "fasta"):
-        i += 1
-        if i > 1:
-            raise ValueError(
-                "Input file contains multiple sequences. "
-                "Only single-sequence files are supported."
-            )
-        main_seq = this_seq.upper()
-    if not main_seq:
-        raise ValueError(
-            f"No sequences found in input file: {input_file_name}"
-        )
+    main_seq = sequences[0].upper()
 
     # ------------------------------------------------------------------------------
     # PERFORM TERMINATOR PREDICTIONS

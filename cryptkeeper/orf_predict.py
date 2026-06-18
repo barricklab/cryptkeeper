@@ -9,7 +9,6 @@ Code adapted from Biopython 1.72 tutorial and cookbook, 20.1.13
 """
 
 import argparse
-import Bio
 from Bio import SeqIO
 import Bio.Data.CodonTable
 from operator import itemgetter
@@ -159,7 +158,7 @@ if __name__ == "__main__":
         dest="t",
         required=False,
         default=11,
-        type=str,
+        type=int,
         help="set NCBI translation table, default = 11: Bacterial, Archaeal, and Plant Plastids",
     )
 
@@ -169,7 +168,7 @@ if __name__ == "__main__":
         dest="l",
         required=False,
         default=30,
-        type=str,
+        type=int,
         help="set minimum length of protein (in amino acids)",
     )
 
